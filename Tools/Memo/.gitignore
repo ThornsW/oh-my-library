@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.eggs/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Tests / tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# PyInstaller
+build/
+dist/
+*.manifest
+*.spec.bak
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Claude Code local state (plans, settings)
+.claude/
+
+# Local app data accidentally placed in repo (DB / settings should live in user data dir)
+*.db
+settings.json

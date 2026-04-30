@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memo"
+version = "0.1.0"
+description = "Cross-platform desktop memo / sticky-note app for tracking todos with Markdown notes"
+requires-python = ">=3.11"
+dependencies = [
+    "PySide6>=6.6",
+    "platformdirs>=4.0",
+    "pynput>=1.7",
+    "qtawesome>=1.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+memo = "memo.app:main"
+
+[tool.setuptools.packages.find]
+include = ["memo*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
