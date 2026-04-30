@@ -15,19 +15,34 @@
 
 ## 从源码运行(开发)
 
-依赖 [`miniforge`](https://github.com/conda-forge/miniforge):
+依赖 [`miniforge`](https://github.com/conda-forge/miniforge)。**Python 必须是 3.11**,这是为了让 conda 的 PySide6 与 Ubuntu 24.04 的系统 Qt 6.4.2 / `fcitx5-frontend-qt6` 严格对齐,中文输入才能正常工作。
 
 ```bash
-mamba create -n memo python=3.12
+mamba create -n memo python=3.11 -y
 mamba activate memo
-mamba install -c conda-forge pyside6 platformdirs pynput pytest qtawesome pyinstaller
+mamba install -c conda-forge -y 'pyside6=6.4.2' 'qt6-main=6.4.2' \
+              platformdirs pynput pytest qtawesome pyinstaller
 
 git clone <your-repo-url> Memo
 cd Memo
-python -m memo
 ```
 
-测试:`pytest`
+**一次性修复**:conda-forge 的 PySide6 6.4 包里 `METADATA` 文件是空的,导致 PyInstaller 取版本失败。补两行就好:
+
+```bash
+SP=$(mamba run -n memo python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
+printf 'Metadata-Version: 2.1\nName: PySide6\nVersion: 6.4.2\n'   > "$SP/PySide6-6.4.2.dist-info/METADATA"
+printf 'Metadata-Version: 2.1\nName: shiboken6\nVersion: 6.4.2\n' > "$SP/shiboken6-6.4.2.dist-info/METADATA"
+```
+
+**Linux 中文输入(开发模式)**:把系统的 fcitx5 Qt6 插件链到 conda Qt 的插件目录:
+
+```bash
+ln -sfn /usr/lib/x86_64-linux-gnu/qt6/plugins/platforminputcontexts/libfcitx5platforminputcontextplugin.so \
+        "$(dirname "$SP")/qt6/plugins/platforminputcontexts/libfcitx5platforminputcontextplugin.so"
+```
+
+运行:`python -m memo`(测试:`pytest`)
 
 ## 打包成单可执行文件
 
@@ -37,9 +52,16 @@ PyInstaller 不支持跨平台打包,需要在 **目标系统** 上运行打包�
 
 ```bash
 ./scripts/build.sh
-# 产物: dist/Memo  (≈117 MB)
+# 产物: dist/Memo  (≈110 MB)
 ./dist/Memo            # 双击或命令行皆可
 ```
+
+打包脚本会把系统的 `libfcitx5platforminputcontextplugin.so` 一并塞进 bundle,所以下载者直接双击就能输入中文,前提是他们的机器上:
+
+- 装并运行了 `fcitx5`(Ubuntu/Debian 的 `fcitx5` + 任一中文引擎)
+- Qt 主版本 ≥ 6.4(Ubuntu 22.04+ / Debian 12+ 都满足)
+
+如果用户用的是 ibus 而不是 fcitx5,bundle 自带的 Qt 6.4 已经包含 ibus 插件,正常工作不需额外配置。
 
 ### Windows
 

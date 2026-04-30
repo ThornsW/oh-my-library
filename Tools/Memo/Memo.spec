@@ -9,6 +9,9 @@ Output:
     dist/Memo.exe        (Windows GUI exe — must be built on Windows)
 """
 
+import os
+import sys
+
 from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
@@ -24,6 +27,15 @@ for pkg in ("PySide6", "shiboken6", "qtawesome", "pynput"):
     datas += d
     binaries += b
     hiddenimports += h
+
+# On Linux, also bundle the fcitx5 Qt6 input-method plugin so end users with
+# fcitx5 (the common Chinese IM on Ubuntu/Debian) can type CJK in the app
+# without installing anything extra. The plugin from the build host is
+# linked against system Qt 6.4 and is ABI-compatible with the bundled Qt 6.4.
+if sys.platform.startswith("linux"):
+    _fcitx_plugin = "/usr/lib/x86_64-linux-gnu/qt6/plugins/platforminputcontexts/libfcitx5platforminputcontextplugin.so"
+    if os.path.exists(_fcitx_plugin):
+        binaries.append((_fcitx_plugin, "PySide6/Qt/plugins/platforminputcontexts"))
 
 a = Analysis(
     ["memo/__main__.py"],
