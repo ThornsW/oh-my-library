@@ -56,11 +56,11 @@ class TagSidebar(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("sidebarPane")
-        self.setMinimumWidth(190)
+        self.setMinimumWidth(210)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(2)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(4)
 
         # ---- "全部待办" nav button (NOT in the tag list) ----
         self._all_btn = QPushButton("全部待办")

@@ -34,18 +34,19 @@ class _SubtaskRow(QWidget):
         self.edit.setStyleSheet(
             "QLineEdit{background:transparent; border:1px solid transparent;"
             "border-radius:4px; padding:4px 6px;}"
-            "QLineEdit:hover{background:#F4F4F5;}"
-            "QLineEdit:focus{background:#FFFFFF; border-color:#6366F1;}"
+            "QLineEdit:hover{background:#F1F5F9;}"
+            "QLineEdit:focus{background:#FFFFFF; border-color:#2563EB;}"
         )
         self.edit.editingFinished.connect(self.changed.emit)
         layout.addWidget(self.edit, 1)
 
-        self.del_btn = QPushButton("✕")
+        self.del_btn = QPushButton("×")
         self.del_btn.setFixedSize(22, 22)
         self.del_btn.setProperty("class", "ghost")
         self.del_btn.setStyleSheet(
-            "QPushButton{color:#A1A1AA; border:none; border-radius:11px;"
-            "background:transparent;}"
+            "QPushButton{color:#94A3B8; border:none; border-radius:11px;"
+            "background:transparent; font-size:15px; font-weight:600;"
+            "padding:0; min-width:22px; min-height:22px;}"
             "QPushButton:hover{color:#DC2626; background:#FEF2F2;}"
         )
         self.del_btn.clicked.connect(lambda: self.deleted.emit(self))
@@ -69,9 +70,9 @@ class SubtaskList(QWidget):
         self._add_btn = QPushButton("+ 添加子任务")
         self._add_btn.setProperty("class", "ghost")
         self._add_btn.setStyleSheet(
-            "QPushButton{color:#71717A; text-align:left; padding:6px 4px;"
+            "QPushButton{color:#64748B; text-align:left; padding:6px 4px;"
             "border:none; background:transparent;}"
-            "QPushButton:hover{color:#4F46E5;}"
+            "QPushButton:hover{color:#2563EB;}"
         )
         self._add_btn.clicked.connect(self._on_add)
         outer.addWidget(self._add_btn)

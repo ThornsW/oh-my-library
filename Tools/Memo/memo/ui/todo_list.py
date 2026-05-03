@@ -43,7 +43,7 @@ class TodoList(QWidget):
 
         self._empty = QLabel("没有待办。\n按 Ctrl+N 新建一个。")
         self._empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._empty.setStyleSheet("color: #A1A1AA; font-size: 13px; padding: 40px;")
+        self._empty.setStyleSheet("color: #94A3B8; font-size: 13px; padding: 40px;")
 
         self._stack.addWidget(self._list)
         self._stack.addWidget(self._empty)

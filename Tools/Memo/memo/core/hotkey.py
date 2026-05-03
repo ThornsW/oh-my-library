@@ -9,11 +9,17 @@ from __future__ import annotations
 
 from typing import Callable
 
-from pynput import keyboard
-
 
 class HotkeyError(RuntimeError):
     """Raised when a hotkey string cannot be parsed or the listener fails."""
+
+
+def _load_keyboard():
+    try:
+        from pynput import keyboard
+    except ImportError as e:  # pragma: no cover - depends on display backend
+        raise HotkeyError(f"全局快捷键后端不可用: {e}") from e
+    return keyboard
 
 
 class HotkeyManager:
@@ -21,7 +27,7 @@ class HotkeyManager:
 
     def __init__(self, callback: Callable[[], None]) -> None:
         self._callback = callback
-        self._listener: keyboard.GlobalHotKeys | None = None
+        self._listener: object | None = None
         self._combo: str | None = None
 
     @property
@@ -30,6 +36,7 @@ class HotkeyManager:
 
     def set_hotkey(self, combo: str) -> None:
         """Parse and start listening on ``combo``. Replaces any previous binding."""
+        keyboard = _load_keyboard()
         try:
             keyboard.HotKey.parse(combo)
         except ValueError as e:

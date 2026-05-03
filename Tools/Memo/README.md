@@ -21,7 +21,7 @@
 mamba create -n memo python=3.11 -y
 mamba activate memo
 mamba install -c conda-forge -y 'pyside6=6.4.2' 'qt6-main=6.4.2' \
-              platformdirs pynput pytest qtawesome pyinstaller
+              platformdirs pynput pytest pyinstaller
 
 git clone <your-repo-url> Memo
 cd Memo
@@ -56,7 +56,7 @@ PyInstaller 不支持跨平台打包,需要在 **目标系统** 上运行打包�
 ./dist/Memo            # 双击或命令行皆可
 ```
 
-打包脚本会把系统的 `libfcitx5platforminputcontextplugin.so` 一并塞进 bundle,所以下载者直接双击就能输入中文,前提是他们的机器上:
+打包脚本会把系统的 `libfcitx5platforminputcontextplugin.so` 一并塞进 bundle,所以下载者直接双击就能在 fcitx5 下输入中文,前提是他们的机器上:
 
 - 装并运行了 `fcitx5`(Ubuntu/Debian 的 `fcitx5` + 任一中文引擎)
 - Qt 主版本 ≥ 6.4(Ubuntu 22.04+ / Debian 12+ 都满足)

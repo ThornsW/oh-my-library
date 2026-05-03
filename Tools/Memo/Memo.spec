@@ -30,8 +30,6 @@ KEEP_PYSIDE_MODULES = {
     "QtGui",
     "QtWidgets",
     "QtDBus",         # required for the tray icon on Linux desktops
-    "QtSvg",          # qtawesome may fall back to SVG glyph rendering
-    "QtSvgWidgets",
 }
 
 # Qt6 shared libraries we keep (matched against the file's basename prefix,
@@ -41,8 +39,6 @@ KEEP_QT_LIB_BASENAMES = {
     "libQt6Gui",
     "libQt6Widgets",
     "libQt6DBus",
-    "libQt6Svg",
-    "libQt6SvgWidgets",
     "libQt6XcbQpa",          # backing lib for the xcb platform plugin
     "libQt6OpenGL",          # libQt6Gui transitively dlopens it
     "libQt6WaylandClient",   # so the bundle also runs on Wayland sessions
@@ -52,13 +48,48 @@ KEEP_QT_PLUGIN_DIRS = {
     "platforms",
     "platforminputcontexts",
     "platformthemes",
-    "iconengines",
     "imageformats",
     "xcbglintegrations",
     "wayland-decoration-client",
     "wayland-graphics-integration-client",
     "wayland-shell-integration",
-    "generic",   # evdev / tslib input device shims
+}
+
+KEEP_QT_PLUGIN_BASENAMES = {
+    "platforms": {
+        "libqxcb",
+        "libqminimal",
+    },
+    "platforminputcontexts": {
+        "libcomposeplatforminputcontextplugin",
+        "libfcitx5platforminputcontextplugin",
+        "libibusplatforminputcontextplugin",
+    },
+    "platformthemes": {
+        "libqxdgdesktopportal",
+    },
+    "imageformats": {
+        "libqgif",
+        "libqico",
+        "libqjpeg",
+    },
+    "xcbglintegrations": {
+        "libqxcb-glx-integration",
+    },
+}
+
+DROP_BINARY_BASENAMES = {
+    # Only needed by filtered SVG/WebP/TIFF Qt plugins or excluded Qt modules.
+    "libQt6Svg",
+    "libQt6SvgWidgets",
+    "libQt6Network",
+    "libLerc",
+    "libdeflate",
+    "libsharpyuv",
+    "libtiff",
+    "libwebp",
+    "libwebpdemux",
+    "libwebpmux",
 }
 
 
@@ -91,22 +122,43 @@ def _qt_plugin_dir(src: str) -> str:
     return ""
 
 
+def _qt_plugin_name(src: str) -> str:
+    return _basename_prefix(src)
+
+
 def _is_qt_plugin(src: str) -> bool:
     return bool(_qt_plugin_dir(src))
 
 
 def _keep_binary(src: str) -> bool:
+    if _basename_prefix(src) in DROP_BINARY_BASENAMES:
+        return False
     if _is_pyside_module_so(src):
         return _pyside_module_name(src) in KEEP_PYSIDE_MODULES
     if _is_qt_lib(src):
         return _basename_prefix(src) in KEEP_QT_LIB_BASENAMES
     if _is_qt_plugin(src):
-        return _qt_plugin_dir(src) in KEEP_QT_PLUGIN_DIRS
+        plugin_dir = _qt_plugin_dir(src)
+        if plugin_dir not in KEEP_QT_PLUGIN_DIRS:
+            return False
+        keep_names = KEEP_QT_PLUGIN_BASENAMES.get(plugin_dir)
+        return keep_names is None or _qt_plugin_name(src) in keep_names
     return True
+
+
+def _filter_toc(entries, predicate):
+    return [entry for entry in entries if predicate(entry[1])]
 
 
 def _keep_data(src: str) -> bool:
     norm = src.replace("\\", "/")
+    name = os.path.basename(src)
+    if name.endswith((".py", ".pyc", ".c", ".h")):
+        return False
+    if name.endswith(".pyi") or name == "py.typed" or ".dist-info/" in norm:
+        return False
+    if "/tests/" in norm or "/test_" in norm:
+        return False
     if "/translations/" in norm and norm.endswith(".qm"):
         return False
     if any(b in norm for b in ("/qml/", "/Qt/qml/", "/QtQuick/", "/Qt3D/", "/QtCharts/")):
@@ -120,7 +172,7 @@ datas = []
 binaries = []
 hiddenimports = []
 
-for pkg in ("PySide6", "shiboken6", "qtawesome", "pynput"):
+for pkg in ("PySide6", "shiboken6", "pynput", "Xlib", "evdev"):
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b
@@ -137,6 +189,18 @@ hiddenimports = [
     if not h.startswith("PySide6.")
     or h.split(".")[1] in KEEP_PYSIDE_MODULES
     or h.split(".")[1] == "support"
+]
+
+# pynput chooses its Linux backend with importlib at runtime. In sandboxed
+# builds, its PyInstaller hook can fail to import pynput because no X
+# connection is available, so the backend modules must be explicit.
+hiddenimports += [
+    "pynput._util.xorg",
+    "pynput._util.xorg_keysyms",
+    "pynput.keyboard._base",
+    "pynput.keyboard._xorg",
+    "pynput.mouse._base",
+    "pynput.mouse._xorg",
 ]
 
 EXCLUDED_PYSIDE = [
@@ -179,6 +243,9 @@ a = Analysis(
     ],
     noarchive=False,
 )
+
+a.binaries = _filter_toc(a.binaries, _keep_binary)
+a.datas = _filter_toc(a.datas, _keep_data)
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 

@@ -37,7 +37,7 @@ def _format_due(due: str | None) -> tuple[str, str, str]:
     try:
         d = _dt.date.fromisoformat(due)
     except ValueError:
-        return due, "#52525B", "#F4F4F5"
+        return due, "#475569", "#F1F5F9"
     today = _dt.date.today()
     delta = (d - today).days
     if delta < 0:
@@ -48,7 +48,7 @@ def _format_due(due: str | None) -> tuple[str, str, str]:
         return "明天", "#9A3412", "#FFEDD5"
     if delta <= 7:
         return f"{delta} 天后", "#1E40AF", "#DBEAFE"
-    return d.strftime("%m-%d"), "#52525B", "#F4F4F5"
+    return d.strftime("%m-%d"), "#475569", "#F1F5F9"
 
 
 class TodoRow(QWidget):
@@ -59,8 +59,8 @@ class TodoRow(QWidget):
         self._todo_id = todo.id
 
         outer = QHBoxLayout(self)
-        outer.setContentsMargins(2, 6, 8, 6)
-        outer.setSpacing(10)
+        outer.setContentsMargins(4, 7, 10, 7)
+        outer.setSpacing(9)
 
         # 3px coloured priority stripe along the left edge of the row
         stripe = QFrame()
@@ -81,9 +81,9 @@ class TodoRow(QWidget):
         self.title = QLabel(todo.title or "(无标题)")
         title_style = "font-size: 14px; font-weight: 600;"
         if todo.completed:
-            title_style += "color: #A1A1AA; text-decoration: line-through;"
+            title_style += "color: #94A3B8; text-decoration: line-through;"
         else:
-            title_style += "color: #18181B;"
+            title_style += "color: #0F172A;"
         self.title.setStyleSheet(title_style)
         self.title.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         col.addWidget(self.title)
@@ -107,14 +107,14 @@ class TodoRow(QWidget):
 
         if len(todo.tags) > 3:
             more = QLabel(f"+{len(todo.tags) - 3}")
-            more.setStyleSheet("color:#A1A1AA; font-size:11px;")
+            more.setStyleSheet("color:#94A3B8; font-size:11px;")
             meta.addWidget(more)
 
         if todo.subtasks:
             done = sum(1 for s in todo.subtasks if s.completed)
             sub_lbl = QLabel(f"☑  {done}/{len(todo.subtasks)}")
             sub_lbl.setStyleSheet(
-                "color:#52525B; background:#F4F4F5; border-radius:9px;"
+                "color:#475569; background:#F1F5F9; border-radius:9px;"
                 "padding:3px 10px; font-size:11px; font-weight:500;"
             )
             meta.addWidget(sub_lbl)

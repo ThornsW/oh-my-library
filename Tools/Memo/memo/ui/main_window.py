@@ -17,10 +17,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-import qtawesome as qta
-
 from memo.core import autostart, db
 from memo.core.settings import Settings
+from memo.ui.icons import app_icon, icon
 from memo.ui.settings_dialog import SettingsDialog
 from memo.ui.tag_sidebar import TagSidebar
 from memo.ui.todo_detail import TodoDetail
@@ -37,7 +36,7 @@ class MainWindow(QMainWindow):
     def __init__(self, settings: Settings) -> None:
         super().__init__()
         self.setWindowTitle("Memo")
-        self.resize(960, 640)
+        self.resize(1040, 680)
         self.setWindowIcon(self._app_icon())
 
         self._settings = settings
@@ -58,7 +57,7 @@ class MainWindow(QMainWindow):
         self.filter_box.currentIndexChanged.connect(self._on_filter)
         toolbar.addWidget(self.filter_box)
 
-        new_action = QAction(qta.icon("fa5s.plus", color="#4F46E5"), "新建", self)
+        new_action = QAction(icon("plus", "#2563EB"), "新建", self)
         new_action.setShortcut(QKeySequence("Ctrl+N"))
         new_action.setToolTip("新建待办 (Ctrl+N)")
         new_action.triggered.connect(self._on_new_todo)
@@ -73,21 +72,21 @@ class MainWindow(QMainWindow):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
         self.search_edit.addAction(
-            qta.icon("fa5s.search", color="#A1A1AA"),
+            icon("search", "#94A3B8"),
             QLineEdit.ActionPosition.LeadingPosition,
         )
         self.search_edit.textChanged.connect(self._on_search)
         toolbar.addWidget(self.search_edit)
 
         # right cluster
-        self.on_top_action = QAction(qta.icon("fa5s.thumbtack"), "置顶", self)
+        self.on_top_action = QAction(icon("pin", "#334155"), "置顶", self)
         self.on_top_action.setCheckable(True)
         self.on_top_action.setChecked(settings.always_on_top)
         self.on_top_action.setToolTip("窗口置顶")
         self.on_top_action.toggled.connect(self._on_top_toggled)
         toolbar.addAction(self.on_top_action)
 
-        settings_action = QAction(qta.icon("fa5s.cog"), "设置", self)
+        settings_action = QAction(icon("settings", "#334155"), "设置", self)
         settings_action.triggered.connect(self._open_settings)
         toolbar.addAction(settings_action)
 
@@ -102,7 +101,7 @@ class MainWindow(QMainWindow):
         list_pane.addWidget(self.todo_detail)
         list_pane.setStretchFactor(0, 0)
         list_pane.setStretchFactor(1, 1)
-        list_pane.setSizes([320, 520])
+        list_pane.setSizes([340, 560])
         list_pane.setHandleWidth(1)
         self._right_splitter = list_pane
 
@@ -111,7 +110,7 @@ class MainWindow(QMainWindow):
         root.addWidget(list_pane)
         root.setStretchFactor(0, 0)
         root.setStretchFactor(1, 1)
-        root.setSizes([200, 760])
+        root.setSizes([220, 820])
         root.setHandleWidth(1)
         root.setChildrenCollapsible(False)
         self._root_splitter = root
@@ -142,7 +141,7 @@ class MainWindow(QMainWindow):
 
     # ---- icon ----
     def _app_icon(self) -> QIcon:
-        return qta.icon("fa5s.sticky-note", color="#F5A623")
+        return app_icon()
 
     # ---- tray ----
     def _build_tray(self) -> QSystemTrayIcon:

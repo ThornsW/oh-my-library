@@ -53,14 +53,14 @@ class TodoDetail(QWidget):
         # ---- empty placeholder ----
         empty = QLabel("← 在左侧选择一条待办,或按 Ctrl+N 新建。")
         empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        empty.setStyleSheet("color: #A1A1AA; font-size: 13px;")
+        empty.setStyleSheet("color: #94A3B8; font-size: 13px;")
         self._stack.addWidget(empty)
 
         # ---- editor pane ----
         editor = QWidget()
         outer = QVBoxLayout(editor)
-        outer.setContentsMargins(28, 24, 28, 20)
-        outer.setSpacing(16)
+        outer.setContentsMargins(32, 28, 32, 22)
+        outer.setSpacing(15)
 
         # header: completed checkbox + big title input
         head = QHBoxLayout()
@@ -72,9 +72,9 @@ class TodoDetail(QWidget):
         self.title_edit = QLineEdit()
         self.title_edit.setPlaceholderText("标题…")
         self.title_edit.setStyleSheet(
-            "QLineEdit{font-size:20px; font-weight:600; color:#18181B;"
-            "background:transparent; border:none; padding:4px 0;}"
-            "QLineEdit:focus{border-bottom:1px solid #6366F1;}"
+            "QLineEdit{font-size:21px; font-weight:600; color:#0F172A;"
+            "background:transparent; border:none; padding:5px 0;}"
+            "QLineEdit:focus{border-bottom:1px solid #2563EB;}"
         )
         head.addWidget(self.title_edit, 1)
         outer.addLayout(head)
@@ -249,7 +249,7 @@ class TodoDetail(QWidget):
                 f"QPushButton{{color:{text_col}; background:{bg_col};"
                 "border-radius:10px; border:none;"
                 "padding:4px 12px; font-size:12px; font-weight:600;"
-                "min-height:18px;}}"
+                "min-height:18px;}"
                 f"QPushButton:hover{{background:{hover_bg};}}"
             )
             chip.clicked.connect(lambda _checked=False, tid=tag.id: self._toggle_tag(tid, False))
