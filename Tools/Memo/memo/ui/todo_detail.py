@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDateEdit,
-    QFormLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -16,6 +15,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QStackedWidget,
     QTabWidget,
     QTextBrowser,
     QToolButton,
@@ -32,6 +32,7 @@ from memo.core.models import (
     Tag,
     Todo,
 )
+from memo.ui._color import darken, hex_to_rgba
 
 
 class TodoDetail(QWidget):
@@ -41,73 +42,113 @@ class TodoDetail(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setObjectName("detailPane")
         self._todo: Todo | None = None
         self._selected_tag_ids: set[int] = set()
 
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(8, 8, 8, 8)
+        # use a stack so when no todo is selected we show a friendly placeholder
+        # rather than a half-disabled blank form.
+        self._stack = QStackedWidget(self)
 
-        # ---- header: completed + title
+        # ---- empty placeholder ----
+        empty = QLabel("← 在左侧选择一条待办,或按 Ctrl+N 新建。")
+        empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty.setStyleSheet("color: #A1A1AA; font-size: 13px;")
+        self._stack.addWidget(empty)
+
+        # ---- editor pane ----
+        editor = QWidget()
+        outer = QVBoxLayout(editor)
+        outer.setContentsMargins(28, 24, 28, 20)
+        outer.setSpacing(16)
+
+        # header: completed checkbox + big title input
         head = QHBoxLayout()
+        head.setSpacing(12)
         self.completed_box = QCheckBox()
         self.completed_box.toggled.connect(self._on_completed_toggled)
+        head.addWidget(self.completed_box, 0, Qt.AlignmentFlag.AlignVCenter)
+
         self.title_edit = QLineEdit()
-        self.title_edit.setPlaceholderText("标题")
-        head.addWidget(self.completed_box)
+        self.title_edit.setPlaceholderText("标题…")
+        self.title_edit.setStyleSheet(
+            "QLineEdit{font-size:20px; font-weight:600; color:#18181B;"
+            "background:transparent; border:none; padding:4px 0;}"
+            "QLineEdit:focus{border-bottom:1px solid #6366F1;}"
+        )
         head.addWidget(self.title_edit, 1)
         outer.addLayout(head)
 
-        # ---- meta row
-        form = QFormLayout()
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        # meta row: due / priority / tags — all on one line, label-free
+        meta = QHBoxLayout()
+        meta.setSpacing(8)
 
-        # due date: enable checkbox + QDateEdit
-        due_row = QHBoxLayout()
-        self.due_check = QCheckBox("设定")
+        # due date controls
+        self.due_check = QCheckBox("截止")
         self.due_check.toggled.connect(self._on_due_check_toggled)
+        meta.addWidget(self.due_check)
+
         self.due_edit = QDateEdit(QDate.currentDate())
         self.due_edit.setCalendarPopup(True)
         self.due_edit.setDisplayFormat("yyyy-MM-dd")
         self.due_edit.setEnabled(False)
-        due_row.addWidget(self.due_check)
-        due_row.addWidget(self.due_edit, 1)
-        due_widget = QWidget()
-        due_widget.setLayout(due_row)
-        form.addRow("截止:", due_widget)
+        self.due_edit.setMaximumWidth(140)
+        meta.addWidget(self.due_edit)
 
+        meta.addSpacing(12)
+
+        prio_lbl = QLabel("优先级")
+        prio_lbl.setProperty("class", "muted")
+        meta.addWidget(prio_lbl)
         self.priority_box = QComboBox()
         self.priority_box.addItem(PRIORITY_LABELS[PRIORITY_LOW], PRIORITY_LOW)
         self.priority_box.addItem(PRIORITY_LABELS[PRIORITY_NORMAL], PRIORITY_NORMAL)
         self.priority_box.addItem(PRIORITY_LABELS[PRIORITY_HIGH], PRIORITY_HIGH)
         self.priority_box.setCurrentIndex(1)
-        form.addRow("优先级:", self.priority_box)
+        self.priority_box.setMaximumWidth(90)
+        meta.addWidget(self.priority_box)
 
-        # tags chip area
-        tags_widget = QWidget()
-        tags_layout = QHBoxLayout(tags_widget)
-        tags_layout.setContentsMargins(0, 0, 0, 0)
-        tags_layout.setSpacing(4)
+        meta.addStretch(1)
+        outer.addLayout(meta)
+
+        # tags row: chips + "+" button
+        tags_row = QHBoxLayout()
+        tags_row.setSpacing(6)
+        tags_lbl = QLabel("标签")
+        tags_lbl.setProperty("class", "muted")
+        tags_row.addWidget(tags_lbl)
         self._chip_box = QHBoxLayout()
-        self._chip_box.setSpacing(4)
+        self._chip_box.setSpacing(6)
+        tags_row.addLayout(self._chip_box)
         self._tag_btn = QToolButton()
-        self._tag_btn.setText("+ 标签")
+        self._tag_btn.setText("+")
         self._tag_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._tag_menu = QMenu(self._tag_btn)
         self._tag_btn.setMenu(self._tag_menu)
-        tags_layout.addLayout(self._chip_box)
-        tags_layout.addWidget(self._tag_btn)
-        tags_layout.addStretch(1)
-        form.addRow("标签:", tags_widget)
-        outer.addLayout(form)
+        tags_row.addWidget(self._tag_btn)
+        tags_row.addStretch(1)
+        outer.addLayout(tags_row)
 
-        # ---- subtasks
-        outer.addWidget(QLabel("子任务:"))
-        from memo.ui.subtask_list import SubtaskList  # local import: UI tree
+        outer.addSpacing(4)
+
+        # subtasks section
+        sub_lbl = QLabel("子任务")
+        sub_lbl.setProperty("class", "muted")
+        outer.addWidget(sub_lbl)
+
+        from memo.ui.subtask_list import SubtaskList  # avoid circular import
         self.subtasks = SubtaskList()
         outer.addWidget(self.subtasks)
 
-        # ---- markdown editor / preview
+        outer.addSpacing(4)
+
+        # markdown editor / preview
+        notes_lbl = QLabel("笔记")
+        notes_lbl.setProperty("class", "muted")
+        outer.addWidget(notes_lbl)
+
         self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
         self.note_edit = QPlainTextEdit()
         self.note_edit.setPlaceholderText("用 Markdown 写笔记…")
         self.note_preview = QTextBrowser()
@@ -117,17 +158,26 @@ class TodoDetail(QWidget):
         self.tabs.currentChanged.connect(self._on_tab_changed)
         outer.addWidget(self.tabs, 1)
 
-        # ---- buttons
+        # buttons
         btns = QHBoxLayout()
         btns.addStretch(1)
         self.delete_btn = QPushButton("删除")
+        self.delete_btn.setProperty("class", "danger")
         self.delete_btn.clicked.connect(self._on_delete)
         self.save_btn = QPushButton("保存")
+        self.save_btn.setProperty("class", "primary")
         self.save_btn.setDefault(True)
         self.save_btn.clicked.connect(self._on_save)
         btns.addWidget(self.delete_btn)
         btns.addWidget(self.save_btn)
         outer.addLayout(btns)
+
+        self._stack.addWidget(editor)
+
+        # outer widget root
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.addWidget(self._stack)
 
         self.set_todo(None)
 
@@ -135,7 +185,7 @@ class TodoDetail(QWidget):
     def set_todo(self, todo: Todo | None) -> None:
         self._todo = todo
         if todo is None:
-            self._set_enabled(False)
+            self._stack.setCurrentIndex(0)  # placeholder
             self.title_edit.clear()
             self.note_edit.clear()
             self.note_preview.clear()
@@ -149,7 +199,7 @@ class TodoDetail(QWidget):
             self.subtasks.set_items([])
             return
 
-        self._set_enabled(True)
+        self._stack.setCurrentIndex(1)  # editor
         self.title_edit.setText(todo.title)
         self.note_edit.setPlainText(todo.note_md)
         self.completed_box.blockSignals(True)
@@ -182,28 +232,25 @@ class TodoDetail(QWidget):
         self._rebuild_tag_menu()
 
     # ---- helpers ----
-    def _set_enabled(self, on: bool) -> None:
-        for w in (
-            self.title_edit, self.completed_box, self.due_check, self.due_edit,
-            self.priority_box, self._tag_btn, self.subtasks, self.note_edit,
-            self.note_preview, self.save_btn, self.delete_btn, self.tabs,
-        ):
-            w.setEnabled(on)
-
     def _rebuild_chips(self, tags: list[Tag]) -> None:
-        # clear
         while self._chip_box.count():
             item = self._chip_box.takeAt(0)
             w = item.widget()
             if w is not None:
+                w.setParent(None)
                 w.deleteLater()
         for tag in tags:
-            chip = QPushButton(f"#{tag.name} ✕")
-            chip.setFlat(True)
+            chip = QPushButton(f"{tag.name}  ✕")
+            chip.setCursor(Qt.CursorShape.PointingHandCursor)
+            text_col = darken(tag.color, 0.45)
+            bg_col = hex_to_rgba(tag.color, 0.20)
+            hover_bg = hex_to_rgba(tag.color, 0.32)
             chip.setStyleSheet(
-                "QPushButton{"
-                f"background:{tag.color}; color:white; border-radius:8px;"
-                "padding:2px 8px;}"
+                f"QPushButton{{color:{text_col}; background:{bg_col};"
+                "border-radius:10px; border:none;"
+                "padding:4px 12px; font-size:12px; font-weight:600;"
+                "min-height:18px;}}"
+                f"QPushButton:hover{{background:{hover_bg};}}"
             )
             chip.clicked.connect(lambda _checked=False, tid=tag.id: self._toggle_tag(tid, False))
             self._chip_box.addWidget(chip)
@@ -228,7 +275,6 @@ class TodoDetail(QWidget):
             self._selected_tag_ids.add(tag_id)
         else:
             self._selected_tag_ids.discard(tag_id)
-        # rebuild chips from cached list of all tags filtered by ids
         all_tags = {t.id: t for t in db.list_tags_with_counts()}
         chips = [all_tags[i] for i in self._selected_tag_ids if i in all_tags]
         self._rebuild_chips(chips)

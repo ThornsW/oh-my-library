@@ -20,22 +20,35 @@ class _SubtaskRow(QWidget):
     def __init__(self, text: str = "", completed: bool = False, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(2, 1, 2, 1)
+        layout.setSpacing(8)
 
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(completed)
         self.checkbox.toggled.connect(self.changed.emit)
+        layout.addWidget(self.checkbox)
 
         self.edit = QLineEdit(text)
         self.edit.setPlaceholderText("子任务…")
+        # blends into the surface; only shows a border on focus.
+        self.edit.setStyleSheet(
+            "QLineEdit{background:transparent; border:1px solid transparent;"
+            "border-radius:4px; padding:4px 6px;}"
+            "QLineEdit:hover{background:#F4F4F5;}"
+            "QLineEdit:focus{background:#FFFFFF; border-color:#6366F1;}"
+        )
         self.edit.editingFinished.connect(self.changed.emit)
+        layout.addWidget(self.edit, 1)
 
         self.del_btn = QPushButton("✕")
-        self.del_btn.setFixedWidth(28)
+        self.del_btn.setFixedSize(22, 22)
+        self.del_btn.setProperty("class", "ghost")
+        self.del_btn.setStyleSheet(
+            "QPushButton{color:#A1A1AA; border:none; border-radius:11px;"
+            "background:transparent;}"
+            "QPushButton:hover{color:#DC2626; background:#FEF2F2;}"
+        )
         self.del_btn.clicked.connect(lambda: self.deleted.emit(self))
-
-        layout.addWidget(self.checkbox)
-        layout.addWidget(self.edit, 1)
         layout.addWidget(self.del_btn)
 
 
@@ -46,23 +59,35 @@ class SubtaskList(QWidget):
         super().__init__(parent)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(2)
+        outer.setSpacing(0)
 
         self._rows_box = QVBoxLayout()
+        self._rows_box.setContentsMargins(0, 0, 0, 0)
         self._rows_box.setSpacing(2)
         outer.addLayout(self._rows_box)
 
         self._add_btn = QPushButton("+ 添加子任务")
+        self._add_btn.setProperty("class", "ghost")
+        self._add_btn.setStyleSheet(
+            "QPushButton{color:#71717A; text-align:left; padding:6px 4px;"
+            "border:none; background:transparent;}"
+            "QPushButton:hover{color:#4F46E5;}"
+        )
         self._add_btn.clicked.connect(self._on_add)
         outer.addWidget(self._add_btn)
 
         self._rows: list[_SubtaskRow] = []
 
     def set_items(self, items: list[tuple[str, bool]]) -> None:
-        for row in list(self._rows):
+        while self._rows:
+            row = self._rows.pop()
             self._rows_box.removeWidget(row)
+            # setParent(None) detaches the widget *immediately*, so it stops
+            # painting before the next event-loop tick. Without this, the old
+            # rows linger as ghost children of self until deleteLater fires
+            # and the user sees stale subtasks bleed across todos.
+            row.setParent(None)
             row.deleteLater()
-        self._rows.clear()
         for text, completed in items:
             self._append_row(text, completed)
 
@@ -88,5 +113,6 @@ class SubtaskList(QWidget):
         if row in self._rows:
             self._rows.remove(row)
             self._rows_box.removeWidget(row)
+            row.setParent(None)
             row.deleteLater()
             self.changed.emit()

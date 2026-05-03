@@ -2,29 +2,53 @@
 
 from __future__ import annotations
 
+import datetime as _dt
+
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QSizePolicy,
+    QVBoxLayout,
     QWidget,
 )
 
 from memo.core.models import (
     PRIORITY_HIGH,
-    PRIORITY_LABELS,
     PRIORITY_LOW,
     PRIORITY_NORMAL,
     Todo,
 )
+from memo.ui._color import darken, hex_to_rgba
 
-_PRIORITY_COLOR = {
-    PRIORITY_HIGH: "#E5484D",
-    PRIORITY_NORMAL: "#F5A623",
-    PRIORITY_LOW: "#8E8E93",
+_PRIORITY_KEY = {
+    PRIORITY_HIGH: "high",
+    PRIORITY_NORMAL: "normal",
+    PRIORITY_LOW: "low",
 }
+
+
+def _format_due(due: str | None) -> tuple[str, str, str]:
+    """Return (display_text, fg_color, bg_color) for the due-date pill."""
+    if not due:
+        return "", "", ""
+    try:
+        d = _dt.date.fromisoformat(due)
+    except ValueError:
+        return due, "#52525B", "#F4F4F5"
+    today = _dt.date.today()
+    delta = (d - today).days
+    if delta < 0:
+        return f"逾期 {-delta} 天", "#B91C1C", "#FEE2E2"
+    if delta == 0:
+        return "今天", "#9A3412", "#FFEDD5"
+    if delta == 1:
+        return "明天", "#9A3412", "#FFEDD5"
+    if delta <= 7:
+        return f"{delta} 天后", "#1E40AF", "#DBEAFE"
+    return d.strftime("%m-%d"), "#52525B", "#F4F4F5"
 
 
 class TodoRow(QWidget):
@@ -34,35 +58,81 @@ class TodoRow(QWidget):
         super().__init__(parent)
         self._todo_id = todo.id
 
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 4, 8, 4)
-        layout.setSpacing(8)
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(2, 6, 8, 6)
+        outer.setSpacing(10)
+
+        # 3px coloured priority stripe along the left edge of the row
+        stripe = QFrame()
+        stripe.setProperty("priorityStripe", _PRIORITY_KEY.get(todo.priority, "low"))
+        stripe.setFixedWidth(3)
+        stripe.setMinimumHeight(40)
+        outer.addWidget(stripe)
 
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(todo.completed)
         self.checkbox.toggled.connect(self._on_toggle)
+        outer.addWidget(self.checkbox, 0, Qt.AlignmentFlag.AlignVCenter)
 
-        self.title = QLabel(todo.title)
-        self.title.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        col = QVBoxLayout()
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(3)
+
+        self.title = QLabel(todo.title or "(无标题)")
+        title_style = "font-size: 14px; font-weight: 600;"
         if todo.completed:
-            self.title.setStyleSheet("color: #888; text-decoration: line-through;")
+            title_style += "color: #A1A1AA; text-decoration: line-through;"
+        else:
+            title_style += "color: #18181B;"
+        self.title.setStyleSheet(title_style)
+        self.title.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        col.addWidget(self.title)
 
-        self.due = QLabel(todo.due_date or "")
-        self.due.setStyleSheet("color: #888;")
-        self.due.setMinimumWidth(80)
-        self.due.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        meta = QHBoxLayout()
+        meta.setContentsMargins(0, 0, 0, 0)
+        meta.setSpacing(6)
 
-        self.dot = QLabel("●")
-        color = QColor(_PRIORITY_COLOR.get(todo.priority, "#8E8E93")).name()
-        label = PRIORITY_LABELS.get(todo.priority, "")
-        self.dot.setStyleSheet(f"color: {color};")
-        self.dot.setToolTip(f"优先级:{label}")
-        self.dot.setMinimumWidth(16)
+        for tag in todo.tags[:3]:
+            chip = QLabel(tag.name)
+            # NB: do NOT use 8-digit hex like `{tag.color}1F` — Qt parses that
+            # as #AARRGGBB and the colour comes out completely wrong. Always
+            # use rgba() for tinted backgrounds. See memo/ui/_color.py.
+            chip.setStyleSheet(
+                f"color:{darken(tag.color, 0.45)};"
+                f"background:{hex_to_rgba(tag.color, 0.20)};"
+                "border-radius:9px; padding:3px 10px;"
+                "font-size:11px; font-weight:600;"
+            )
+            meta.addWidget(chip)
 
-        layout.addWidget(self.checkbox)
-        layout.addWidget(self.title, 1)
-        layout.addWidget(self.due)
-        layout.addWidget(self.dot)
+        if len(todo.tags) > 3:
+            more = QLabel(f"+{len(todo.tags) - 3}")
+            more.setStyleSheet("color:#A1A1AA; font-size:11px;")
+            meta.addWidget(more)
+
+        if todo.subtasks:
+            done = sum(1 for s in todo.subtasks if s.completed)
+            sub_lbl = QLabel(f"☑  {done}/{len(todo.subtasks)}")
+            sub_lbl.setStyleSheet(
+                "color:#52525B; background:#F4F4F5; border-radius:9px;"
+                "padding:3px 10px; font-size:11px; font-weight:500;"
+            )
+            meta.addWidget(sub_lbl)
+
+        meta.addStretch(1)
+
+        due_text, due_fg, due_bg = _format_due(todo.due_date)
+        if due_text:
+            due_lbl = QLabel(due_text)
+            due_lbl.setStyleSheet(
+                f"color:{due_fg}; background:{due_bg};"
+                "border-radius:9px; padding:3px 12px;"
+                "font-size:11px; font-weight:600;"
+            )
+            meta.addWidget(due_lbl)
+
+        col.addLayout(meta)
+        outer.addLayout(col, 1)
 
     def _on_toggle(self, checked: bool) -> None:
         self.completedToggled.emit(self._todo_id, checked)

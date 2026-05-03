@@ -7,6 +7,13 @@ Build:
 Output:
     dist/Memo            (Linux ELF)
     dist/Memo.exe        (Windows GUI exe — must be built on Windows)
+
+Memo is a pure QWidget app — no QML / QtQuick / networking / multimedia.
+``collect_all`` would otherwise drag in QtWebEngine, all of Qt3D,
+QtMultimedia, QtSensors, QtPositioning … bloating the bundle to 100MB+
+for no reason. We aggressively filter both the PySide6 Python binding
+modules and the underlying Qt6 shared libraries / Qt plugins down to
+what the app actually needs at runtime.
 """
 
 import os
@@ -16,26 +23,147 @@ from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
 
+# --- which PySide6 modules / Qt libs / Qt plugins to keep -----------------
+
+KEEP_PYSIDE_MODULES = {
+    "QtCore",
+    "QtGui",
+    "QtWidgets",
+    "QtDBus",         # required for the tray icon on Linux desktops
+    "QtSvg",          # qtawesome may fall back to SVG glyph rendering
+    "QtSvgWidgets",
+}
+
+# Qt6 shared libraries we keep (matched against the file's basename prefix,
+# i.e. "libQt6Core" matches "libQt6Core.so.6.4.2").
+KEEP_QT_LIB_BASENAMES = {
+    "libQt6Core",
+    "libQt6Gui",
+    "libQt6Widgets",
+    "libQt6DBus",
+    "libQt6Svg",
+    "libQt6SvgWidgets",
+    "libQt6XcbQpa",          # backing lib for the xcb platform plugin
+    "libQt6OpenGL",          # libQt6Gui transitively dlopens it
+    "libQt6WaylandClient",   # so the bundle also runs on Wayland sessions
+}
+
+KEEP_QT_PLUGIN_DIRS = {
+    "platforms",
+    "platforminputcontexts",
+    "platformthemes",
+    "iconengines",
+    "imageformats",
+    "xcbglintegrations",
+    "wayland-decoration-client",
+    "wayland-graphics-integration-client",
+    "wayland-shell-integration",
+    "generic",   # evdev / tslib input device shims
+}
+
+
+def _basename_prefix(p: str) -> str:
+    name = os.path.basename(p)
+    return name.split(".", 1)[0]
+
+
+def _is_pyside_module_so(src: str) -> bool:
+    norm = src.replace("\\", "/")
+    name = os.path.basename(src)
+    return "/PySide6/" in norm and name.endswith(".abi3.so")
+
+
+def _pyside_module_name(src: str) -> str:
+    return os.path.basename(src).rsplit(".", 2)[0]
+
+
+def _is_qt_lib(src: str) -> bool:
+    name = os.path.basename(src)
+    return name.startswith("libQt6") or name.startswith("Qt6")
+
+
+def _qt_plugin_dir(src: str) -> str:
+    norm = src.replace("\\", "/")
+    if "/qt6/plugins/" in norm:
+        return norm.split("/qt6/plugins/", 1)[1].split("/", 1)[0]
+    if "/PySide6/Qt/plugins/" in norm:
+        return norm.split("/PySide6/Qt/plugins/", 1)[1].split("/", 1)[0]
+    return ""
+
+
+def _is_qt_plugin(src: str) -> bool:
+    return bool(_qt_plugin_dir(src))
+
+
+def _keep_binary(src: str) -> bool:
+    if _is_pyside_module_so(src):
+        return _pyside_module_name(src) in KEEP_PYSIDE_MODULES
+    if _is_qt_lib(src):
+        return _basename_prefix(src) in KEEP_QT_LIB_BASENAMES
+    if _is_qt_plugin(src):
+        return _qt_plugin_dir(src) in KEEP_QT_PLUGIN_DIRS
+    return True
+
+
+def _keep_data(src: str) -> bool:
+    norm = src.replace("\\", "/")
+    if "/translations/" in norm and norm.endswith(".qm"):
+        return False
+    if any(b in norm for b in ("/qml/", "/Qt/qml/", "/QtQuick/", "/Qt3D/", "/QtCharts/")):
+        return False
+    return True
+
+
+# --- collect everything, then filter --------------------------------------
+
 datas = []
 binaries = []
 hiddenimports = []
 
-# PySide6 ships Qt plugins, qtawesome ships its bundled fonts, pynput needs
-# its platform-specific submodules — let collect_all pull all of that in.
 for pkg in ("PySide6", "shiboken6", "qtawesome", "pynput"):
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b
     hiddenimports += h
 
-# On Linux, also bundle the fcitx5 Qt6 input-method plugin so end users with
-# fcitx5 (the common Chinese IM on Ubuntu/Debian) can type CJK in the app
-# without installing anything extra. The plugin from the build host is
-# linked against system Qt 6.4 and is ABI-compatible with the bundled Qt 6.4.
+binaries = [(s, d) for s, d in binaries if _keep_binary(s)]
+datas = [(s, d) for s, d in datas if _keep_data(s) and _keep_binary(s)]
+
+# bundle Memo's own data resources (QSS stylesheet, etc.)
+datas += [("memo/resources/style.qss", "memo/resources")]
+
+hiddenimports = [
+    h for h in hiddenimports
+    if not h.startswith("PySide6.")
+    or h.split(".")[1] in KEEP_PYSIDE_MODULES
+    or h.split(".")[1] == "support"
+]
+
+EXCLUDED_PYSIDE = [
+    "PySide6.Qt3DAnimation", "PySide6.Qt3DCore", "PySide6.Qt3DExtras",
+    "PySide6.Qt3DInput", "PySide6.Qt3DLogic", "PySide6.Qt3DRender",
+    "PySide6.QtCharts", "PySide6.QtConcurrent", "PySide6.QtDataVisualization",
+    "PySide6.QtHelp", "PySide6.QtMultimedia", "PySide6.QtMultimediaWidgets",
+    "PySide6.QtNetwork", "PySide6.QtNetworkAuth", "PySide6.QtOpenGL",
+    "PySide6.QtOpenGLWidgets", "PySide6.QtPdf", "PySide6.QtPdfWidgets",
+    "PySide6.QtPositioning", "PySide6.QtPrintSupport", "PySide6.QtQml",
+    "PySide6.QtQuick", "PySide6.QtQuick3D", "PySide6.QtQuickControls2",
+    "PySide6.QtQuickWidgets", "PySide6.QtRemoteObjects", "PySide6.QtScxml",
+    "PySide6.QtSensors", "PySide6.QtSerialBus", "PySide6.QtSerialPort",
+    "PySide6.QtSpatialAudio", "PySide6.QtSql", "PySide6.QtStateMachine",
+    "PySide6.QtTest", "PySide6.QtTextToSpeech", "PySide6.QtUiTools",
+    "PySide6.QtWebChannel", "PySide6.QtWebEngineCore", "PySide6.QtWebEngineQuick",
+    "PySide6.QtWebEngineWidgets", "PySide6.QtWebSockets", "PySide6.QtXml",
+]
+
+# --- Linux: bundle the system fcitx5 Qt6 IM plugin so Chinese input works
+#     out of the box for users running fcitx5. The plugin from Ubuntu 24.04
+#     is ABI-compatible with our bundled Qt 6.4.2.
 if sys.platform.startswith("linux"):
     _fcitx_plugin = "/usr/lib/x86_64-linux-gnu/qt6/plugins/platforminputcontexts/libfcitx5platforminputcontextplugin.so"
     if os.path.exists(_fcitx_plugin):
         binaries.append((_fcitx_plugin, "PySide6/Qt/plugins/platforminputcontexts"))
+
 
 a = Analysis(
     ["memo/__main__.py"],
@@ -46,7 +174,9 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=EXCLUDED_PYSIDE + [
+        "numpy", "pandas", "scipy", "matplotlib", "PIL", "tkinter",
+    ],
     noarchive=False,
 )
 
@@ -62,7 +192,7 @@ exe = EXE(
     name="Memo",
     debug=False,
     bootloader_ignore_signals=False,
-    strip=False,
+    strip=True,    # strip ELF debug symbols
     upx=False,
     runtime_tmpdir=None,
     console=False,

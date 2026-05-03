@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QByteArray, Qt, Signal, Slot
+from PySide6.QtCore import QByteArray, QSize, Qt, Signal, Slot
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QComboBox,
@@ -37,7 +37,7 @@ class MainWindow(QMainWindow):
     def __init__(self, settings: Settings) -> None:
         super().__init__()
         self.setWindowTitle("Memo")
-        self.resize(900, 600)
+        self.resize(960, 640)
         self.setWindowIcon(self._app_icon())
 
         self._settings = settings
@@ -45,62 +45,75 @@ class MainWindow(QMainWindow):
         # ---- toolbar ----
         toolbar = QToolBar()
         toolbar.setMovable(False)
+        toolbar.setIconSize(QSize(16, 16))
         self.addToolBar(toolbar)
 
-        self.on_top_action = QAction(qta.icon("fa5s.thumbtack"), "置顶", self)
-        self.on_top_action.setCheckable(True)
-        self.on_top_action.setChecked(settings.always_on_top)
-        self.on_top_action.toggled.connect(self._on_top_toggled)
-        toolbar.addAction(self.on_top_action)
-
-        toolbar.addSeparator()
-
-        self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("搜索…")
-        self.search_edit.setClearButtonEnabled(True)
-        self.search_edit.setMaximumWidth(220)
-        self.search_edit.textChanged.connect(self._on_search)
-        toolbar.addWidget(self.search_edit)
-
+        # left cluster: filter + new
         self.filter_box = QComboBox()
         for value, label in _FILTER_DATA:
             self.filter_box.addItem(label, value)
         idx = self.filter_box.findData(settings.filter)
         self.filter_box.setCurrentIndex(idx if idx >= 0 else 0)
+        self.filter_box.setMinimumWidth(96)
         self.filter_box.currentIndexChanged.connect(self._on_filter)
         toolbar.addWidget(self.filter_box)
 
-        new_action = QAction(qta.icon("fa5s.plus"), "新建待办", self)
+        new_action = QAction(qta.icon("fa5s.plus", color="#4F46E5"), "新建", self)
         new_action.setShortcut(QKeySequence("Ctrl+N"))
+        new_action.setToolTip("新建待办 (Ctrl+N)")
         new_action.triggered.connect(self._on_new_todo)
         toolbar.addAction(new_action)
 
-        spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        toolbar.addWidget(spacer)
+        # center: search expands to fill available space
+        self.search_edit = QLineEdit()
+        self.search_edit.setObjectName("searchEdit")
+        self.search_edit.setPlaceholderText("搜索标题或笔记…")
+        self.search_edit.setClearButtonEnabled(True)
+        self.search_edit.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        self.search_edit.addAction(
+            qta.icon("fa5s.search", color="#A1A1AA"),
+            QLineEdit.ActionPosition.LeadingPosition,
+        )
+        self.search_edit.textChanged.connect(self._on_search)
+        toolbar.addWidget(self.search_edit)
+
+        # right cluster
+        self.on_top_action = QAction(qta.icon("fa5s.thumbtack"), "置顶", self)
+        self.on_top_action.setCheckable(True)
+        self.on_top_action.setChecked(settings.always_on_top)
+        self.on_top_action.setToolTip("窗口置顶")
+        self.on_top_action.toggled.connect(self._on_top_toggled)
+        toolbar.addAction(self.on_top_action)
 
         settings_action = QAction(qta.icon("fa5s.cog"), "设置", self)
         settings_action.triggered.connect(self._open_settings)
         toolbar.addAction(settings_action)
 
         # ---- central splitter layout ----
+        # 3-pane mail-client style: sidebar | list | detail.
         self.sidebar = TagSidebar()
         self.todo_list = TodoList()
         self.todo_detail = TodoDetail()
 
-        right = QSplitter(Qt.Orientation.Vertical)
-        right.addWidget(self.todo_list)
-        right.addWidget(self.todo_detail)
-        right.setStretchFactor(0, 1)
-        right.setStretchFactor(1, 1)
-        self._right_splitter = right
+        list_pane = QSplitter(Qt.Orientation.Horizontal)
+        list_pane.addWidget(self.todo_list)
+        list_pane.addWidget(self.todo_detail)
+        list_pane.setStretchFactor(0, 0)
+        list_pane.setStretchFactor(1, 1)
+        list_pane.setSizes([320, 520])
+        list_pane.setHandleWidth(1)
+        self._right_splitter = list_pane
 
         root = QSplitter(Qt.Orientation.Horizontal)
         root.addWidget(self.sidebar)
-        root.addWidget(right)
+        root.addWidget(list_pane)
         root.setStretchFactor(0, 0)
         root.setStretchFactor(1, 1)
-        root.setSizes([200, 700])
+        root.setSizes([200, 760])
+        root.setHandleWidth(1)
+        root.setChildrenCollapsible(False)
         self._root_splitter = root
 
         self.setCentralWidget(root)
