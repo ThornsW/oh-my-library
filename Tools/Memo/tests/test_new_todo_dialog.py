@@ -44,3 +44,17 @@ def test_create_todo_from_data_persists_all_creation_fields(db):
         ("整理数据", False),
         ("提交报告", True),
     ]
+
+
+def test_create_todo_from_data_removes_todo_when_post_create_persistence_fails(db):
+    from memo.ui.new_todo_dialog import NewTodoData, create_todo_from_data
+
+    with pytest.raises(Exception):
+        create_todo_from_data(
+            NewTodoData(
+                title="should not remain",
+                tag_ids=[999999],
+            )
+        )
+
+    assert db.count_all_todos() == 0
