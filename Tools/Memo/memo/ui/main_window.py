@@ -6,7 +6,6 @@ from PySide6.QtCore import QByteArray, QSize, Qt, Signal, Slot
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QComboBox,
-    QInputDialog,
     QLineEdit,
     QMainWindow,
     QMenu,
@@ -20,6 +19,7 @@ from PySide6.QtWidgets import (
 from memo.core import autostart, db
 from memo.core.settings import Settings
 from memo.ui.icons import app_icon, icon
+from memo.ui.new_todo_dialog import NewTodoDialog, create_todo_from_data
 from memo.ui.settings_dialog import SettingsDialog
 from memo.ui.tag_sidebar import TagSidebar
 from memo.ui.todo_detail import TodoDetail
@@ -214,10 +214,11 @@ class MainWindow(QMainWindow):
         self._save_settings()
 
     def _on_new_todo(self) -> None:
-        title, ok = QInputDialog.getText(self, "新建待办", "标题:")
-        if not ok or not title.strip():
+        dlg = NewTodoDialog(self)
+        if dlg.exec() != dlg.DialogCode.Accepted:
             return
-        todo_id = db.create_todo(title.strip())
+
+        todo_id = create_todo_from_data(dlg.todo_data())
         self.sidebar.refresh()
         self.todo_list.refresh()
         self.todo_list.select_todo(todo_id)

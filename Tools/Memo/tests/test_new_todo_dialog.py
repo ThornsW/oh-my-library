@@ -103,3 +103,13 @@ def test_new_todo_dialog_rejects_empty_title(db, qapp, monkeypatch):
 
     assert dialog.result() == dialog.DialogCode.Rejected
     assert warnings == ["标题不能为空。"]
+
+
+def test_main_window_new_action_uses_full_new_todo_dialog():
+    from pathlib import Path
+
+    source = Path("memo/ui/main_window.py").read_text(encoding="utf-8")
+
+    assert "QInputDialog" not in source
+    assert "NewTodoDialog" in source
+    assert "create_todo_from_data" in source
