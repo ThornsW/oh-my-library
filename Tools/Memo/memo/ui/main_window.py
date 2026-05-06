@@ -219,9 +219,25 @@ class MainWindow(QMainWindow):
             return
 
         todo_id = create_todo_from_data(dlg.todo_data())
+        self._show_new_todo_in_visible_list()
         self.sidebar.refresh()
         self.todo_list.refresh()
         self.todo_list.select_todo(todo_id)
+
+    def _show_new_todo_in_visible_list(self) -> None:
+        if self._settings.filter != "active" or self.filter_box.currentData() != "active":
+            active_idx = self.filter_box.findData("active")
+            if active_idx >= 0:
+                self.filter_box.setCurrentIndex(active_idx)
+                self._on_filter(active_idx)
+
+        if self._settings.selected_tag_id is not None:
+            self.sidebar.select_tag(None)
+            self._on_tag_selected(None)
+
+        if self.search_edit.text():
+            self.search_edit.clear()
+            self._on_search("")
 
     def _open_settings(self) -> None:
         dlg = SettingsDialog(self._settings, self)

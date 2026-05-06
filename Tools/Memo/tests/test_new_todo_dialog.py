@@ -113,3 +113,124 @@ def test_main_window_new_action_uses_full_new_todo_dialog():
     assert "QInputDialog" not in source
     assert "NewTodoDialog" in source
     assert "create_todo_from_data" in source
+
+
+def test_main_window_new_todo_switches_to_visible_filters(monkeypatch):
+    from memo.ui import main_window
+    from memo.ui.main_window import MainWindow
+
+    class FakeSettings:
+        filter = "done"
+        selected_tag_id = 99
+
+        def save(self):
+            pass
+
+    class FakeFilterBox:
+        def __init__(self):
+            self.current_index = 2
+            self.set_indexes = []
+            self.values = ["active", "all", "done"]
+
+        def currentData(self):
+            return self.values[self.current_index]
+
+        def findData(self, value):
+            return self.values.index(value)
+
+        def setCurrentIndex(self, index):
+            self.current_index = index
+            self.set_indexes.append(index)
+
+    class FakeSearchEdit:
+        def __init__(self):
+            self.value = "will hide item"
+            self.cleared = False
+
+        def text(self):
+            return self.value
+
+        def clear(self):
+            self.value = ""
+            self.cleared = True
+
+    class FakeSidebar:
+        def __init__(self):
+            self.selected = 99
+            self.refresh_count = 0
+
+        def selected_tag_id(self):
+            return self.selected
+
+        def select_tag(self, tag_id):
+            self.selected = tag_id
+
+        def refresh(self):
+            self.refresh_count += 1
+
+    class FakeTodoList:
+        def __init__(self):
+            self.filter = "done"
+            self.tag = 99
+            self.search = "will hide item"
+            self.refresh_count = 0
+            self.selected_todo = None
+
+        def set_filter(self, value):
+            self.filter = value
+
+        def set_tag(self, tag_id):
+            self.tag = tag_id
+
+        def set_search(self, text):
+            self.search = text
+
+        def refresh(self):
+            self.refresh_count += 1
+
+        def select_todo(self, todo_id):
+            self.selected_todo = todo_id
+
+    class FakeDialog:
+        class DialogCode:
+            Accepted = 1
+
+        def __init__(self, parent):
+            self.parent = parent
+
+        def exec(self):
+            return self.DialogCode.Accepted
+
+        def todo_data(self):
+            return object()
+
+    created = []
+
+    def fake_create_todo_from_data(data):
+        created.append(data)
+        return 42
+
+    monkeypatch.setattr(main_window, "NewTodoDialog", FakeDialog)
+    monkeypatch.setattr(main_window, "create_todo_from_data", fake_create_todo_from_data)
+
+    window = MainWindow.__new__(MainWindow)
+    window._settings = FakeSettings()
+    window.filter_box = FakeFilterBox()
+    window.search_edit = FakeSearchEdit()
+    window.sidebar = FakeSidebar()
+    window.todo_list = FakeTodoList()
+
+    window._on_new_todo()
+
+    assert len(created) == 1
+    assert window._settings.filter == "active"
+    assert window.filter_box.set_indexes == [0]
+    assert window._settings.selected_tag_id is None
+    assert window.sidebar.selected is None
+    assert window.search_edit.cleared is True
+    assert window.todo_list.filter == "active"
+    assert window.todo_list.tag is None
+    assert window.todo_list.search == ""
+    assert window.sidebar.refresh_count == 1
+    assert window.todo_list.refresh_count >= 1
+    assert window.todo_list.selected_todo == 42
