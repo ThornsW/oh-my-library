@@ -78,6 +78,24 @@ KEEP_QT_PLUGIN_BASENAMES = {
     },
 }
 
+# Specific full filenames to drop. Use this set when only one version of a
+# multi-versioned library family should be dropped — DROP_BINARY_BASENAMES
+# below matches by prefix and would kill every version.
+#
+# The bundled fcitx5 plugin (Ubuntu 24.04) drags in system ICU 74 alongside
+# Qt6Core's hard-linked conda ICU 70 — ~22 MB of duplicate Unicode data
+# (compressed). We keep ICU 70 (Qt6Core can't run without it) and drop the
+# ICU 74 copy. At runtime on Ubuntu 24.04, libicu*.so.74 are still found via
+# the system loader, so the fcitx5 plugin works. Older distros without ICU
+# 74 (e.g. Ubuntu 22.04) lose the bundled fcitx5 fallback and must rely on
+# their system input-method stack (ibus / system Compose).
+DROP_FULL_BASENAMES = {
+    "libicudata.so.74",
+    "libicui18n.so.74",
+    "libicuuc.so.74",
+}
+
+
 DROP_BINARY_BASENAMES = {
     # Only needed by filtered SVG/WebP/TIFF Qt plugins or excluded Qt modules.
     "libQt6Svg",
@@ -90,6 +108,18 @@ DROP_BINARY_BASENAMES = {
     "libwebp",
     "libwebpdemux",
     "libwebpmux",
+    # Transitive deps of the bundled fcitx5 input-method plugin (Ubuntu 24.04
+    # system libs). These are universally present on supported Linux desktops,
+    # so the bundle's copies just bloat the binary — drop them and let the
+    # runtime loader fall back to the system copy.
+    "libcrypto",
+    "libssl",
+    "libsystemd",
+    "libgcrypt",
+    "libgpg-error",
+    "libzstd",
+    "liblz4",
+    "libcap",
 }
 
 
@@ -131,6 +161,8 @@ def _is_qt_plugin(src: str) -> bool:
 
 
 def _keep_binary(src: str) -> bool:
+    if os.path.basename(src) in DROP_FULL_BASENAMES:
+        return False
     if _basename_prefix(src) in DROP_BINARY_BASENAMES:
         return False
     if _is_pyside_module_so(src):
@@ -240,6 +272,8 @@ a = Analysis(
     runtime_hooks=[],
     excludes=EXCLUDED_PYSIDE + [
         "numpy", "pandas", "scipy", "matplotlib", "PIL", "tkinter",
+        # Memo never does decimal arithmetic; _decimal alone is ~1.5 MB.
+        "_decimal", "decimal",
     ],
     noarchive=False,
 )
@@ -260,7 +294,14 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=True,    # strip ELF debug symbols
-    upx=False,
+    upx=False,     # PyInstaller disables UPX on non-Windows by default
+                   # because UPX-compressing modern Linux shared libs
+                   # (libpython, Qt6 cores, libstdc++, libpyside6/shiboken6,
+                   # …) is known to cause SIGSEGV at dlopen time. Empirical
+                   # tests with PYINSTALLER_FORCE_UPX=1 confirmed the binary
+                   # still core-dumps even after excluding the obvious risk
+                   # libs — leave UPX off until a stable exclude set is
+                   # narrowed down.
     runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
