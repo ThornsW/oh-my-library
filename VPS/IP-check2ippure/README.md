@@ -8,13 +8,16 @@ IPPure 返回的是「发起请求那条连接的出口 IP」的信息。本工�
 
 ## 运行要求
 
+- **平台**：Linux / macOS（amd64 或 arm64，自动匹配对应 mihomo 构建）；原生 Windows 请在 WSL 下运行。
 - **Python 3.10+**，仅用标准库，**无需 `pip install` 任何包**。
 - 首次运行会自动从 GitHub Releases 下载 mihomo（clash-meta）静态二进制到 `bin/`（之后复用并校验 SHA256）。
 - 联网：需能访问 GitHub（下载 mihomo）以及各节点服务器。
 
 ## ⚠️ 运行前必须关闭本机的透明/系统代理
 
-> 下文以 OpenWrt 上的 **PassWall** 为例；你用别的透明代理（OpenClash、sing-box、TUN 模式等）同理。脚本里的提示文案写作 “PassWall”，按你的实际情况操作即可。
+> 下文以 OpenWrt 上的 **PassWall** 为例；你用别的透明代理（OpenClash、sing-box、TUN 模式等）同理，脚本里的提示文案写作 “PassWall”，按你的实际情况操作即可。
+>
+> 如果你本机**没有**任何透明/系统代理（本来就是直连上网），脚本停下提示时直接回车继续即可。
 
 两个原因：
 
