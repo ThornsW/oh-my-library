@@ -8,14 +8,14 @@ IPPure 返回的是「发起请求那条连接的出口 IP」的信息。本工�
 
 ## 运行要求
 
-- **平台**：Linux / macOS（amd64 或 arm64，自动匹配对应 mihomo 构建）；原生 Windows 请在 WSL 下运行。
+- **平台**：Linux / macOS / Windows（amd64 或 arm64，自动匹配并下载对应的 mihomo 构建）。
 - **Python 3.10+**，仅用标准库，**无需 `pip install` 任何包**。
 - 首次运行会自动从 GitHub Releases 下载 mihomo（clash-meta）静态二进制到 `bin/`（之后复用并校验 SHA256）。
 - 联网：需能访问 GitHub（下载 mihomo）以及各节点服务器。
 
 ## ⚠️ 运行前必须关闭本机的透明/系统代理
 
-> 下文以 OpenWrt 上的 **PassWall** 为例；你用别的透明代理（OpenClash、sing-box、TUN 模式等）同理，脚本里的提示文案写作 “PassWall”，按你的实际情况操作即可。
+> 下文以 OpenWrt 上的 **PassWall** 为例；你用别的透明/系统代理（OpenClash、sing-box、TUN 模式、Clash for Windows、Windows 系统代理等）同理，脚本里的提示文案写作 “PassWall”，按你的实际情况关闭即可。
 >
 > 如果你本机**没有**任何透明/系统代理（本来就是直连上网），脚本停下提示时直接回车继续即可。
 
@@ -38,7 +38,9 @@ cd IP-check2ippure
 python3 check_airport.py '<订阅URL>' --name 机场名
 ```
 
-> **订阅 URL 一定要用单引号包起来**：很多订阅链接带 `&`，不加引号会被 shell 当成后台符拆断命令。
+> **跨平台提示**：
+> - 命令里的 `python3` 在 Windows 上请用 `python` 或 `py`。
+> - **订阅 URL 一定要加引号**（很多链接带 `&` 等特殊字符，不加会被 shell 拆断）：Linux / macOS / Windows PowerShell 用单引号 `'...'`；Windows **cmd.exe** 用双引号 `"..."`。
 
 选项：
 
