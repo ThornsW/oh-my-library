@@ -1,0 +1,9 @@
+bin/
+run/
+results/*
+!results/.gitkeep
+__pycache__/
+*.pyc
+
+# 设计文档/实现计划含本机私有信息（路由器口令、机场地址、绝对路径等），仅本地保留，不公开
+docs/
