@@ -21,8 +21,6 @@ import sys
 
 from PyInstaller.utils.hooks import collect_all
 
-block_cipher = None
-
 # --- which PySide6 modules / Qt libs / Qt plugins to keep -----------------
 
 KEEP_PYSIDE_MODULES = {
@@ -281,13 +279,14 @@ a = Analysis(
 a.binaries = _filter_toc(a.binaries, _keep_binary)
 a.datas = _filter_toc(a.datas, _keep_data)
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+# PyInstaller 6 dropped bytecode encryption (``cipher``) along with
+# ``Analysis.zipped_data`` / ``Analysis.zipfiles``; both were unused here.
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
-    a.zipfiles,
     a.datas,
     [],
     name="Memo",
