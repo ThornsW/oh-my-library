@@ -361,19 +361,3 @@ def set_subtasks(todo_id: int, items: list[tuple[str, bool]]) -> None:
                 (todo_id, text, 1 if done else 0, pos),
             )
         conn.execute("UPDATE todos SET updated_at = ? WHERE id = ?", (_now_iso(), todo_id))
-
-
-def toggle_subtask(subtask_id: int, completed: bool) -> None:
-    conn = _conn_or_raise()
-    with conn:
-        conn.execute(
-            "UPDATE subtasks SET completed = ? WHERE id = ?",
-            (1 if completed else 0, subtask_id),
-        )
-        conn.execute(
-            """
-            UPDATE todos SET updated_at = ?
-             WHERE id = (SELECT todo_id FROM subtasks WHERE id = ?)
-            """,
-            (_now_iso(), subtask_id),
-        )

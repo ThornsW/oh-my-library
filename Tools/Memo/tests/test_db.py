@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from memo.core import db as db_mod
 from memo.core.models import PRIORITY_HIGH, PRIORITY_LOW, PRIORITY_NORMAL
 
 
@@ -113,16 +112,12 @@ def test_search_matches_title_and_note(db):
     assert set(found) == {"alpha task", "beta"}
 
 
-def test_subtasks_replace_and_toggle(db):
+def test_subtasks_replace_whole_list(db):
     todo_id = db.create_todo("compound task")
     db.set_subtasks(todo_id, [("step 1", False), ("step 2", True), ("step 3", False)])
     todo = db.get_todo(todo_id)
     assert [s.text for s in todo.subtasks] == ["step 1", "step 2", "step 3"]
     assert [s.completed for s in todo.subtasks] == [False, True, False]
-
-    db.toggle_subtask(todo.subtasks[0].id, True)
-    todo = db.get_todo(todo_id)
-    assert todo.subtasks[0].completed is True
 
     db.set_subtasks(todo_id, [("only step", False)])
     todo = db.get_todo(todo_id)

@@ -227,10 +227,6 @@ class TodoDetail(QWidget):
 
         self.tabs.setCurrentIndex(0)
 
-    def refresh_tags_from_db(self) -> None:
-        """Pick up newly-created or renamed tags without re-loading the todo."""
-        self._rebuild_tag_menu()
-
     # ---- helpers ----
     def _rebuild_chips(self, tags: list[Tag]) -> None:
         while self._chip_box.count():

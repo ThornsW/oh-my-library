@@ -14,7 +14,6 @@ from PySide6.QtWidgets import (
 
 
 class _SubtaskRow(QWidget):
-    changed = Signal()
     deleted = Signal(object)  # emits self
 
     def __init__(self, text: str = "", completed: bool = False, parent: QWidget | None = None) -> None:
@@ -25,7 +24,6 @@ class _SubtaskRow(QWidget):
 
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(completed)
-        self.checkbox.toggled.connect(self.changed.emit)
         layout.addWidget(self.checkbox)
 
         self.edit = QLineEdit(text)
@@ -37,7 +35,6 @@ class _SubtaskRow(QWidget):
             "QLineEdit:hover{background:#F1F5F9;}"
             "QLineEdit:focus{background:#FFFFFF; border-color:#2563EB;}"
         )
-        self.edit.editingFinished.connect(self.changed.emit)
         layout.addWidget(self.edit, 1)
 
         self.del_btn = QPushButton("×")
@@ -54,8 +51,6 @@ class _SubtaskRow(QWidget):
 
 
 class SubtaskList(QWidget):
-    changed = Signal()
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         outer = QVBoxLayout(self)
@@ -101,7 +96,6 @@ class SubtaskList(QWidget):
 
     def _append_row(self, text: str = "", completed: bool = False) -> None:
         row = _SubtaskRow(text, completed)
-        row.changed.connect(self.changed.emit)
         row.deleted.connect(self._remove_row)
         self._rows_box.addWidget(row)
         self._rows.append(row)
@@ -116,4 +110,3 @@ class SubtaskList(QWidget):
             self._rows_box.removeWidget(row)
             row.setParent(None)
             row.deleteLater()
-            self.changed.emit()

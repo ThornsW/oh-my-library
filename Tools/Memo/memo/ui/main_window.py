@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QByteArray, QSize, Qt, Signal, Slot
-from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
+from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
 from PySide6.QtWidgets import (
     QComboBox,
     QLineEdit,
     QMainWindow,
     QMenu,
+    QMessageBox,
     QSizePolicy,
     QSplitter,
     QSystemTrayIcon,
     QToolBar,
-    QWidget,
 )
 
 from memo.core import autostart, db
@@ -37,7 +37,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Memo")
         self.resize(1040, 680)
-        self.setWindowIcon(self._app_icon())
+        self.setWindowIcon(app_icon())
 
         self._settings = settings
 
@@ -119,6 +119,7 @@ class MainWindow(QMainWindow):
 
         # ---- wire signals ----
         self.sidebar.tagSelected.connect(self._on_tag_selected)
+        self.sidebar.newTodoRequested.connect(self._on_new_todo_for_tag)
         self.todo_list.todoSelected.connect(self._on_todo_selected)
         self.todo_list.todoCompletedToggled.connect(self._on_completed_toggled_in_list)
         self.todo_detail.saved.connect(self._on_detail_saved)
@@ -139,13 +140,9 @@ class MainWindow(QMainWindow):
         self.todo_list.set_tag(settings.selected_tag_id)
         self.todo_list.refresh()
 
-    # ---- icon ----
-    def _app_icon(self) -> QIcon:
-        return app_icon()
-
     # ---- tray ----
     def _build_tray(self) -> QSystemTrayIcon:
-        tray = QSystemTrayIcon(self._app_icon(), self)
+        tray = QSystemTrayIcon(app_icon(), self)
         menu = QMenu()
         toggle = QAction("显示 / 隐藏", menu)
         toggle.triggered.connect(self.toggle_visible)
@@ -214,26 +211,39 @@ class MainWindow(QMainWindow):
         self._save_settings()
 
     def _on_new_todo(self) -> None:
-        dlg = NewTodoDialog(self)
+        self._create_todo(tag_id=None)
+
+    def _on_new_todo_for_tag(self, tag_id: int) -> None:
+        """Sidebar context menu: create a todo already filed under ``tag_id``."""
+        self._create_todo(tag_id=tag_id)
+
+    def _create_todo(self, *, tag_id: int | None) -> None:
+        preselected = [tag_id] if tag_id is not None else []
+        dlg = NewTodoDialog(self, preselected_tag_ids=preselected)
         if dlg.exec() != dlg.DialogCode.Accepted:
             return
 
-        todo_id = create_todo_from_data(dlg.todo_data())
-        self._show_new_todo_in_visible_list()
+        data = dlg.todo_data()
+        todo_id = create_todo_from_data(data)
+        # Stay on the tag the todo was filed under so the user sees it land
+        # there; if they unticked that tag in the dialog, fall back to 全部待办.
+        stay_on = tag_id if tag_id is not None and tag_id in data.tag_ids else None
+        self._show_new_todo_in_visible_list(stay_on)
         self.sidebar.refresh()
         self.todo_list.refresh()
         self.todo_list.select_todo(todo_id)
 
-    def _show_new_todo_in_visible_list(self) -> None:
+    def _show_new_todo_in_visible_list(self, tag_id: int | None = None) -> None:
+        """Relax filters so a just-created todo is actually on screen."""
         if self._settings.filter != "active" or self.filter_box.currentData() != "active":
             active_idx = self.filter_box.findData("active")
             if active_idx >= 0:
                 self.filter_box.setCurrentIndex(active_idx)
                 self._on_filter(active_idx)
 
-        if self._settings.selected_tag_id is not None:
-            self.sidebar.select_tag(None)
-            self._on_tag_selected(None)
+        if self._settings.selected_tag_id != tag_id:
+            self.sidebar.select_tag(tag_id)
+            self._on_tag_selected(tag_id)
 
         if self.search_edit.text():
             self.search_edit.clear()
@@ -249,7 +259,6 @@ class MainWindow(QMainWindow):
             try:
                 autostart.set_enabled(new_settings.autostart)
             except Exception as e:
-                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, "开机自启设置失败", str(e))
                 new_settings.autostart = autostart.is_enabled()
         # always-on-top

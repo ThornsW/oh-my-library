@@ -15,6 +15,10 @@ Selection is mutually exclusive between the "全部待办" navigation button at
 the top and the tag list below. The ``tagSelected`` signal carries:
     - ``None`` when 全部待办 is active (show all)
     - ``int`` when a specific tag is selected
+
+Right-clicking a tag opens a context menu that can also create a todo already
+filed under that tag; the sidebar only reports the request via
+``newTodoRequested`` — the main window owns the dialog and the refresh.
 """
 
 from __future__ import annotations
@@ -22,7 +26,6 @@ from __future__ import annotations
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
-    QHBoxLayout,
     QInputDialog,
     QLabel,
     QListWidget,
@@ -52,6 +55,7 @@ def _color_swatch(color_hex: str | None) -> QIcon:
 
 class TagSidebar(QWidget):
     tagSelected = Signal(object)  # int | None
+    newTodoRequested = Signal(int)  # tag_id the new todo should be filed under
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -103,8 +107,7 @@ class TagSidebar(QWidget):
     def selected_tag_id(self) -> int | None:
         return self._selected_tag_id
 
-    def refresh(self, *, preserve_selection: bool = True) -> None:
-        prev = self._selected_tag_id if preserve_selection else None
+    def refresh(self) -> None:
         self._all_btn.setText(f"全部待办  ·  {db.count_active_todos()}")
 
         self._list.blockSignals(True)
@@ -115,8 +118,7 @@ class TagSidebar(QWidget):
             self._list.addItem(item)
         self._list.blockSignals(False)
 
-        # restore visual state
-        self._selected_tag_id = prev
+        # rebuilding the rows dropped the visual selection; put it back
         self._sync_selection()
 
     # ---- internal ----
@@ -185,15 +187,22 @@ class TagSidebar(QWidget):
         item = self._list.itemAt(pos)
         if item is None:
             return
-        tag_id = item.data(Qt.ItemDataRole.UserRole)
+        menu = self._build_tag_menu(item.data(Qt.ItemDataRole.UserRole))
+        menu.exec(self._list.viewport().mapToGlobal(pos))
+
+    def _build_tag_menu(self, tag_id: int) -> QMenu:
         menu = QMenu(self)
+        new_todo = QAction("在此标签下新建待办…", menu)
         rename = QAction("重命名…", menu)
         delete = QAction("删除", menu)
+        new_todo.triggered.connect(lambda: self.newTodoRequested.emit(tag_id))
         rename.triggered.connect(lambda: self._rename_tag(tag_id))
         delete.triggered.connect(lambda: self._delete_tag(tag_id))
+        menu.addAction(new_todo)
+        menu.addSeparator()
         menu.addAction(rename)
         menu.addAction(delete)
-        menu.exec(self._list.viewport().mapToGlobal(pos))
+        return menu
 
     def _rename_tag(self, tag_id: int) -> None:
         current = next((t for t in db.list_tags_with_counts() if t.id == tag_id), None)

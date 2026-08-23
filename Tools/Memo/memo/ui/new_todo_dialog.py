@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from PySide6.QtCore import QDate, Qt
@@ -40,13 +41,21 @@ class NewTodoData:
 
 
 class NewTodoDialog(QDialog):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        preselected_tag_ids: Iterable[int] = (),
+    ) -> None:
+        """``preselected_tag_ids`` starts the dialog with those tags ticked —
+        used when the todo is created from a tag's context menu."""
         super().__init__(parent)
         self.setWindowTitle("新建待办")
         self.setModal(True)
         self.resize(420, 480)
 
         self._tag_checks: dict[int, QCheckBox] = {}
+        preselected = set(preselected_tag_ids)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(18, 18, 18, 18)
@@ -96,6 +105,7 @@ class NewTodoDialog(QDialog):
         if tags:
             for tag in tags:
                 check = QCheckBox(tag.name)
+                check.setChecked(tag.id in preselected)
                 self._tag_checks[tag.id] = check
                 tag_layout.addWidget(check)
         else:
