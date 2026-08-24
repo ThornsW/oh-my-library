@@ -227,6 +227,10 @@ class TodoDetail(QWidget):
 
         self.tabs.setCurrentIndex(0)
 
+    def current_todo_id(self) -> int | None:
+        """Which todo the editor is showing, if any."""
+        return self._todo.id if self._todo is not None else None
+
     # ---- helpers ----
     def _rebuild_chips(self, tags: list[Tag]) -> None:
         while self._chip_box.count():

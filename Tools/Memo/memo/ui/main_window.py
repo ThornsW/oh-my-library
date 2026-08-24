@@ -282,15 +282,16 @@ class MainWindow(QMainWindow):
         self.todo_detail.set_todo(todo)
 
     def _on_completed_toggled_in_list(self, todo_id: int, completed: bool) -> None:
-        db.set_completed(todo_id, completed)
-        self.sidebar.refresh()
-        self.todo_list.refresh()
-        # re-load detail if showing this item
-        current = self.todo_detail._todo  # type: ignore[attr-defined]
-        if current is not None and current.id == todo_id:
+        self._apply_completed(todo_id, completed)
+        # the detail panel didn't originate this, so re-load it if it's showing
+        # the same todo
+        if self.todo_detail.current_todo_id() == todo_id:
             self.todo_detail.set_todo(db.get_todo(todo_id))
 
     def _on_completed_toggled_in_detail(self, todo_id: int, completed: bool) -> None:
+        self._apply_completed(todo_id, completed)
+
+    def _apply_completed(self, todo_id: int, completed: bool) -> None:
         db.set_completed(todo_id, completed)
         self.sidebar.refresh()
         self.todo_list.refresh()

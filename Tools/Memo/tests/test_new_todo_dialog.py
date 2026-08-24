@@ -1,27 +1,19 @@
 from __future__ import annotations
 
-import os
-
 import pytest
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+pytest.importorskip("PySide6")
 
-PySide6 = pytest.importorskip("PySide6")
-
-from PySide6.QtWidgets import QApplication  # noqa: E402
-
-from memo.core.models import PRIORITY_HIGH  # noqa: E402
-from memo.ui.new_todo_dialog import NewTodoData  # noqa: E402
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    return QApplication.instance() or QApplication([])
+from memo.core.models import PRIORITY_HIGH, PRIORITY_LOW  # noqa: E402
+from memo.ui.new_todo_dialog import (  # noqa: E402
+    NewTodoData,
+    NewTodoDialog,
+    create_todo_from_data,
+)
+from memo.ui.tag_sidebar import TagSidebar  # noqa: E402
 
 
 def test_create_todo_from_data_persists_all_creation_fields(db):
-    from memo.ui.new_todo_dialog import NewTodoData, create_todo_from_data
-
     tag = db.create_tag("实验")
     todo_id = create_todo_from_data(
         NewTodoData(
@@ -48,8 +40,6 @@ def test_create_todo_from_data_persists_all_creation_fields(db):
 
 
 def test_create_todo_from_data_removes_todo_when_post_create_persistence_fails(db):
-    from memo.ui.new_todo_dialog import NewTodoData, create_todo_from_data
-
     with pytest.raises(Exception):
         create_todo_from_data(
             NewTodoData(
@@ -58,14 +48,11 @@ def test_create_todo_from_data_removes_todo_when_post_create_persistence_fails(d
             )
         )
 
-    assert db.count_all_todos() == 0
+    assert db.list_todos(filter_="all") == []
 
 
 def test_new_todo_dialog_exposes_entered_form_data(db, qapp):
     from PySide6.QtCore import QDate
-
-    from memo.core.models import PRIORITY_LOW
-    from memo.ui.new_todo_dialog import NewTodoDialog
 
     work = db.create_tag("工作")
     personal = db.create_tag("个人")
@@ -107,8 +94,6 @@ def test_new_todo_dialog_rejects_empty_title(db, qapp, monkeypatch):
 
 
 def test_new_todo_dialog_preselects_requested_tags(db, qapp):
-    from memo.ui.new_todo_dialog import NewTodoDialog
-
     work = db.create_tag("工作")
     personal = db.create_tag("个人")
 
@@ -122,8 +107,6 @@ def test_new_todo_dialog_preselects_requested_tags(db, qapp):
 
 
 def test_tag_sidebar_context_menu_requests_new_todo_under_that_tag(db, qapp):
-    from memo.ui.tag_sidebar import TagSidebar
-
     tag = db.create_tag("科研")
     sidebar = TagSidebar()
 

@@ -1,8 +1,31 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
+
+# Must be set before any test module imports PySide6. conftest is imported
+# first, so this covers every Qt test in one place.
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    """The one QApplication for the whole run, set up the way memo.app does.
+
+    Qt allows a single instance per process, so this has to be shared. Applying
+    the real style and stylesheet keeps layout assertions honest.
+    """
+    pytest.importorskip("PySide6")
+    from PySide6.QtWidgets import QApplication
+
+    from memo.app import _load_stylesheet
+
+    app = QApplication.instance() or QApplication([])
+    app.setStyle("Fusion")
+    app.setStyleSheet(_load_stylesheet())
+    return app
 
 
 @pytest.fixture

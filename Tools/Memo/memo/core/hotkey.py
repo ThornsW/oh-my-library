@@ -22,6 +22,18 @@ def _load_keyboard():
     return keyboard
 
 
+def validate(combo: str) -> None:
+    """Raise :class:`HotkeyError` if ``combo`` is unusable as a global hotkey.
+
+    Lets the settings dialog reject a bad combo without starting a listener.
+    """
+    keyboard = _load_keyboard()
+    try:
+        keyboard.HotKey.parse(combo)
+    except ValueError as e:
+        raise HotkeyError(f"无法解析的快捷键: {combo!r} ({e})") from e
+
+
 class HotkeyManager:
     """Owns a single ``GlobalHotKeys`` listener and lets us swap the binding."""
 
@@ -36,11 +48,8 @@ class HotkeyManager:
 
     def set_hotkey(self, combo: str) -> None:
         """Parse and start listening on ``combo``. Replaces any previous binding."""
+        validate(combo)
         keyboard = _load_keyboard()
-        try:
-            keyboard.HotKey.parse(combo)
-        except ValueError as e:
-            raise HotkeyError(f"无法解析的快捷键: {combo!r} ({e})") from e
 
         self.stop()
         listener = keyboard.GlobalHotKeys({combo: self._callback})

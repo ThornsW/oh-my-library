@@ -1,26 +1,13 @@
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
 import pytest
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+pytest.importorskip("PySide6")
 
-PySide6 = pytest.importorskip("PySide6")
-
-from PySide6.QtWidgets import QApplication, QLabel  # noqa: E402
+from PySide6.QtWidgets import QLabel  # noqa: E402
 
 from memo.core.models import PRIORITY_NORMAL, Subtask, Tag, Todo  # noqa: E402
 from memo.ui import todo_list as todo_list_mod  # noqa: E402
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    app.setStyle("Fusion")
-    app.setStyleSheet(Path("memo/resources/style.qss").read_text(encoding="utf-8"))
-    return app
 
 
 def test_todo_row_widget_owns_its_height_without_list_item_padding(monkeypatch, qapp):

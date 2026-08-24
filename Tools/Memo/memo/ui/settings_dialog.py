@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from memo.core import hotkey
 from memo.core.settings import Settings
 
 
@@ -67,15 +68,9 @@ class SettingsDialog(QDialog):
         )
 
     def _accept(self) -> None:
-        combo = self.hotkey_edit.text().strip()
         try:
-            from pynput import keyboard
-
-            keyboard.HotKey.parse(combo)
-        except ImportError as e:
-            QMessageBox.warning(self, "快捷键后端不可用", f"{e}\n\n{HOTKEY_HELP}")
-            return
-        except ValueError as e:
-            QMessageBox.warning(self, "快捷键格式错误", f"{e}\n\n{HOTKEY_HELP}")
+            hotkey.validate(self.hotkey_edit.text().strip())
+        except hotkey.HotkeyError as e:
+            QMessageBox.warning(self, "快捷键无效", f"{e}\n\n{HOTKEY_HELP}")
             return
         self.accept()

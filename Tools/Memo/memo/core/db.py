@@ -125,17 +125,12 @@ def count_active_todos() -> int:
     return int(row[0])
 
 
-def count_all_todos() -> int:
-    conn = _conn_or_raise()
-    row = conn.execute("SELECT COUNT(*) FROM todos").fetchone()
-    return int(row[0])
-
-
 def create_tag(name: str, color: str = "#7AA2F7") -> Tag:
     conn = _conn_or_raise()
-    cur = conn.execute("INSERT INTO tags(name, color) VALUES (?, ?)", (name.strip(), color))
+    clean = name.strip()
+    cur = conn.execute("INSERT INTO tags(name, color) VALUES (?, ?)", (clean, color))
     conn.commit()
-    return Tag(id=cur.lastrowid, name=name.strip(), color=color, count=0)
+    return Tag(id=cur.lastrowid, name=clean, color=color, count=0)
 
 
 def rename_tag(tag_id: int, name: str) -> None:
@@ -151,6 +146,20 @@ def delete_tag(tag_id: int) -> None:
 
 
 # ---------- Todos ----------
+
+def _row_to_tag(r: sqlite3.Row) -> Tag:
+    return Tag(id=r["id"], name=r["name"], color=r["color"])
+
+
+def _row_to_subtask(r: sqlite3.Row) -> Subtask:
+    return Subtask(
+        id=r["id"],
+        todo_id=r["todo_id"],
+        text=r["text"],
+        completed=bool(r["completed"]),
+        position=r["position"],
+    )
+
 
 def _row_to_todo(r: sqlite3.Row) -> Todo:
     return Todo(
@@ -226,7 +235,7 @@ def list_todos(
     ).fetchall()
     by_id = {t.id: t for t in todos}
     for r in tag_rows:
-        by_id[r["todo_id"]].tags.append(Tag(id=r["id"], name=r["name"], color=r["color"]))
+        by_id[r["todo_id"]].tags.append(_row_to_tag(r))
 
     sub_rows = conn.execute(
         f"""
@@ -238,15 +247,7 @@ def list_todos(
         ids,
     ).fetchall()
     for r in sub_rows:
-        by_id[r["todo_id"]].subtasks.append(
-            Subtask(
-                id=r["id"],
-                todo_id=r["todo_id"],
-                text=r["text"],
-                completed=bool(r["completed"]),
-                position=r["position"],
-            )
-        )
+        by_id[r["todo_id"]].subtasks.append(_row_to_subtask(r))
     return todos
 
 
@@ -257,7 +258,7 @@ def get_todo(todo_id: int) -> Todo | None:
         return None
     todo = _row_to_todo(r)
     todo.tags = [
-        Tag(id=tr["id"], name=tr["name"], color=tr["color"])
+        _row_to_tag(tr)
         for tr in conn.execute(
             """
             SELECT t.id, t.name, t.color
@@ -269,13 +270,7 @@ def get_todo(todo_id: int) -> Todo | None:
         ).fetchall()
     ]
     todo.subtasks = [
-        Subtask(
-            id=sr["id"],
-            todo_id=sr["todo_id"],
-            text=sr["text"],
-            completed=bool(sr["completed"]),
-            position=sr["position"],
-        )
+        _row_to_subtask(sr)
         for sr in conn.execute(
             "SELECT * FROM subtasks WHERE todo_id = ? ORDER BY position ASC, id ASC",
             (todo_id,),
