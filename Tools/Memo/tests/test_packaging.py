@@ -19,18 +19,23 @@ def test_qtawesome_is_not_a_runtime_dependency() -> None:
         assert "qta." not in text
 
 
-def test_fcitx_plugin_is_bundled_by_default() -> None:
+def test_distro_fcitx5_plugin_is_never_bundled() -> None:
+    """Qt requires an exact QT_VERSION match for QPA plugins, so a plugin
+    built against the distro's Qt cannot load from our bundled Qt. Pulling it
+    in only ships a file Qt will refuse — fcitx5 is reached over IBus."""
     spec = (ROOT / "Memo.spec").read_text(encoding="utf-8")
 
-    assert "MEMO_BUNDLE_FCITX" not in spec
-    assert "libfcitx5platforminputcontextplugin.so" in spec
-    assert "if sys.platform.startswith(\"linux\"):" in spec
+    assert "/usr/lib/x86_64-linux-gnu/qt6/plugins" not in spec
+    assert '"libfcitx5platforminputcontextplugin"' not in spec
 
 
-def test_fcitx_plugin_survives_binary_filter() -> None:
+def test_ibus_input_context_plugin_survives_binary_filter() -> None:
+    """The bundle's own ibus plugin is what carries Chinese input."""
     spec = (ROOT / "Memo.spec").read_text(encoding="utf-8")
 
-    assert '"libfcitx5platforminputcontextplugin"' in spec
+    assert '"libibusplatforminputcontextplugin"' in spec
+    assert '"libcomposeplatforminputcontextplugin"' in spec
+    assert '"platforminputcontexts"' in spec
 
 
 def test_linux_hotkey_backend_dependencies_are_collected() -> None:

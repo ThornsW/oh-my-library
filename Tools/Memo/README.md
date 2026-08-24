@@ -20,12 +20,12 @@ Memo 是一个本地桌面待办和 Markdown 笔记应用。它使用 PySide6 �
 ## 环境要求
 
 - Miniforge 或 Mambaforge
-- Python 3.11
-- PySide6 6.4.x
-- Linux 打包中文输入:构建机需要安装 `fcitx5` 和 Qt6 fcitx5 输入法插件
+- Python 3.11 或更高
+- PySide6 6.4 或更高
+- Linux 中文输入:运行的桌面上有 fcitx5(默认启用 ibusfrontend)或 ibus
 - Windows 全局快捷键:依赖 `pynput`
 
-Python 和 PySide6 版本被固定在 3.11 / 6.4.x,是为了匹配 Ubuntu 24.04 的系统 Qt 6.4.2 和 `fcitx5-frontend-qt6` 插件 ABI。不要把依赖装进 `base` 环境。
+构建机的 Qt 版本不需要和用户桌面的 Qt 对齐——中文输入走 IBus 协议,不依赖系统的 Qt 插件,见下文。不要把依赖装进 `base` 环境。
 
 ## 从源码运行
 
@@ -33,10 +33,9 @@ Python 和 PySide6 版本被固定在 3.11 / 6.4.x,是为了匹配 Ubuntu 24.04 
 git clone <repo-url> Memo
 cd Memo
 
-mamba create -n memo python=3.11 -y
+mamba create -n memo -c conda-forge -y python=3.11 \
+  pyside6 qt6-main platformdirs pynput pytest pyinstaller
 mamba activate memo
-mamba install -c conda-forge -y 'pyside6=6.4.*' 'qt6-main=6.4.*' \
-  platformdirs pynput pytest pyinstaller
 
 python -m memo
 ```
@@ -45,23 +44,32 @@ python -m memo
 
 ## Linux 中文输入
 
-源码运行时,conda Qt 需要能加载系统的 fcitx5 Qt6 输入法插件。先确认系统里有插件:
+Memo 通过 **IBus 协议**接入输入法,不使用系统的 fcitx5 Qt 插件。
 
-```bash
-test -f /usr/lib/x86_64-linux-gnu/qt6/plugins/platforminputcontexts/libfcitx5platforminputcontextplugin.so
+原因是 Qt 对 QPA 插件要求 `QT_VERSION` **精确匹配**,连同一大版本都不行。打包后的程序自带一份 Qt,而发行版的 `libfcitx5platforminputcontextplugin.so` 是按系统 Qt 编译的,两者必然对不上:
+
+```text
+Ignoring QPA plugin due to mismatching Qt versions 396032 394240
+... undefined symbol: QWindowSystemInterface::handleExtendedKeyEvent(...)
 ```
 
-如果源码运行无法输入中文,把系统插件链接到 conda Qt 的插件目录:
+而 Qt 自带的 ibus 插件就在 bundle 内部,版本永远一致。fcitx5 通过 `ibusfrontend` 附加组件提供 IBus 服务——它占用 `org.freedesktop.IBus` 总线名,并写出和 `ibus-daemon` 相同的地址文件。所以让 Qt 走 ibus,实际接到的仍然是 fcitx5。
+
+启动时 `memo/core/input_method.py` 会做这件事:如果 `QT_IM_MODULE` 是 `fcitx`/`fcitx5`,且检测到有进程正在提供 IBus 服务(读 `~/.config/ibus/bus/` 下的地址文件并确认其中记录的 PID 仍存活),就把 `QT_IM_MODULE` 改写为 `ibus`。检测不到就原样放行,不会影响已经配好的环境。
+
+因此:
+
+- 构建机不需要安装 fcitx5,也不需要 Qt6 的 fcitx5 插件
+- 构建机的 Qt 版本和用户桌面的 Qt 版本无关
+- 用户侧只需要 fcitx5(ibusfrontend 默认开启)或 ibus 正在运行
+
+排查时可以看插件实际加载情况:
 
 ```bash
-SP=$(mamba run -n memo python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
-QT_INPUT_DIR="$(dirname "$SP")/qt6/plugins/platforminputcontexts"
-mkdir -p "$QT_INPUT_DIR"
-ln -sfn /usr/lib/x86_64-linux-gnu/qt6/plugins/platforminputcontexts/libfcitx5platforminputcontextplugin.so \
-  "$QT_INPUT_DIR/libfcitx5platforminputcontextplugin.so"
+QT_LOGGING_RULES="qt.qpa.input.methods=true" ./dist/Memo
 ```
 
-打包时,`Memo.spec` 会在 Linux 上自动把构建机的 `libfcitx5platforminputcontextplugin.so` 放进 bundle,并保留 ibus 插件。下载者仍需要自己的系统正在运行 fcitx5 和中文输入引擎。
+正常会输出 `socketWatcher.addPath ".../ibus/bus/<machine-id>-unix-0"`,该文件里的 `IBUS_DAEMON_PID` 就是 fcitx5 的进程号。
 
 ## 测试
 

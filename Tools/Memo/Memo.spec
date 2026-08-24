@@ -17,7 +17,6 @@ what the app actually needs at runtime.
 """
 
 import os
-import sys
 
 from PyInstaller.utils.hooks import collect_all
 
@@ -58,9 +57,11 @@ KEEP_QT_PLUGIN_BASENAMES = {
         "libqxcb",
         "libqminimal",
     },
+    # Only plugins from our own Qt: Qt requires an exact QT_VERSION match for
+    # QPA plugins, so the distro's fcitx5 plugin can never load here. fcitx5
+    # is reached over IBus instead — see memo/core/input_method.py.
     "platforminputcontexts": {
         "libcomposeplatforminputcontextplugin",
-        "libfcitx5platforminputcontextplugin",
         "libibusplatforminputcontextplugin",
     },
     "platformthemes": {
@@ -76,24 +77,6 @@ KEEP_QT_PLUGIN_BASENAMES = {
     },
 }
 
-# Specific full filenames to drop. Use this set when only one version of a
-# multi-versioned library family should be dropped — DROP_BINARY_BASENAMES
-# below matches by prefix and would kill every version.
-#
-# The bundled fcitx5 plugin (Ubuntu 24.04) drags in system ICU 74 alongside
-# Qt6Core's hard-linked conda ICU 70 — ~22 MB of duplicate Unicode data
-# (compressed). We keep ICU 70 (Qt6Core can't run without it) and drop the
-# ICU 74 copy. At runtime on Ubuntu 24.04, libicu*.so.74 are still found via
-# the system loader, so the fcitx5 plugin works. Older distros without ICU
-# 74 (e.g. Ubuntu 22.04) lose the bundled fcitx5 fallback and must rely on
-# their system input-method stack (ibus / system Compose).
-DROP_FULL_BASENAMES = {
-    "libicudata.so.74",
-    "libicui18n.so.74",
-    "libicuuc.so.74",
-}
-
-
 DROP_BINARY_BASENAMES = {
     # Only needed by filtered SVG/WebP/TIFF Qt plugins or excluded Qt modules.
     "libQt6Svg",
@@ -106,18 +89,6 @@ DROP_BINARY_BASENAMES = {
     "libwebp",
     "libwebpdemux",
     "libwebpmux",
-    # Transitive deps of the bundled fcitx5 input-method plugin (Ubuntu 24.04
-    # system libs). These are universally present on supported Linux desktops,
-    # so the bundle's copies just bloat the binary — drop them and let the
-    # runtime loader fall back to the system copy.
-    "libcrypto",
-    "libssl",
-    "libsystemd",
-    "libgcrypt",
-    "libgpg-error",
-    "libzstd",
-    "liblz4",
-    "libcap",
 }
 
 
@@ -159,8 +130,6 @@ def _is_qt_plugin(src: str) -> bool:
 
 
 def _keep_binary(src: str) -> bool:
-    if os.path.basename(src) in DROP_FULL_BASENAMES:
-        return False
     if _basename_prefix(src) in DROP_BINARY_BASENAMES:
         return False
     if _is_pyside_module_so(src):
@@ -249,15 +218,6 @@ EXCLUDED_PYSIDE = [
     "PySide6.QtWebChannel", "PySide6.QtWebEngineCore", "PySide6.QtWebEngineQuick",
     "PySide6.QtWebEngineWidgets", "PySide6.QtWebSockets", "PySide6.QtXml",
 ]
-
-# --- Linux: bundle the system fcitx5 Qt6 IM plugin so Chinese input works
-#     out of the box for users running fcitx5. The plugin from Ubuntu 24.04
-#     is ABI-compatible with our bundled Qt 6.4.2.
-if sys.platform.startswith("linux"):
-    _fcitx_plugin = "/usr/lib/x86_64-linux-gnu/qt6/plugins/platforminputcontexts/libfcitx5platforminputcontextplugin.so"
-    if os.path.exists(_fcitx_plugin):
-        binaries.append((_fcitx_plugin, "PySide6/Qt/plugins/platforminputcontexts"))
-
 
 a = Analysis(
     ["memo/__main__.py"],

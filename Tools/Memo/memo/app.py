@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
-from memo.core import db
+from memo.core import db, input_method
 from memo.core.hotkey import HotkeyError, HotkeyManager
 from memo.core.settings import Settings
 from memo.core.singleton import acquire_or_signal_running
@@ -35,6 +35,10 @@ class _ThreadBridge(QObject):
 
 
 def main() -> int:
+    # Must happen before QApplication: Qt reads QT_IM_MODULE while building
+    # the platform integration.
+    input_method.configure()
+
     # Single-instance: a second launch wakes the running tray (raising the
     # main window) and exits, instead of spawning a duplicate icon.
     singleton = acquire_or_signal_running()

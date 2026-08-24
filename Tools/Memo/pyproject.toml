@@ -6,13 +6,13 @@ build-backend = "setuptools.build_meta"
 name = "memo"
 version = "0.1.0"
 description = "Cross-platform desktop memo / sticky-note app for tracking todos with Markdown notes"
-# Python 3.11 + PySide6 6.4 are pinned to match Ubuntu 24.04's system Qt 6.4.2,
-# which is the version of the fcitx5 Qt6 IM plugin bundled in our PyInstaller
-# build. Keeping these in lock-step is what lets Chinese input work in the
-# packaged binary.
-requires-python = ">=3.11,<3.12"
+# Chinese input reaches fcitx5 over the IBus protocol instead of the distro's
+# fcitx5 Qt plugin, so the bundled Qt no longer has to match the user's desktop
+# Qt and nothing here needs pinning to one Qt minor. See
+# memo/core/input_method.py for why the plugin route cannot work.
+requires-python = ">=3.11"
 dependencies = [
-    "PySide6==6.4.*",
+    "PySide6>=6.4",
     "platformdirs>=4.0",
     "pynput>=1.7",
 ]
