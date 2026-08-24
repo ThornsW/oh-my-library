@@ -55,7 +55,17 @@ Ignoring QPA plugin due to mismatching Qt versions 396032 394240
 
 而 Qt 自带的 ibus 插件就在 bundle 内部,版本永远一致。fcitx5 通过 `ibusfrontend` 附加组件提供 IBus 服务——它占用 `org.freedesktop.IBus` 总线名,并写出和 `ibus-daemon` 相同的地址文件。所以让 Qt 走 ibus,实际接到的仍然是 fcitx5。
 
-启动时 `memo/core/input_method.py` 会做这件事:如果 `QT_IM_MODULE` 是 `fcitx`/`fcitx5`,且检测到有进程正在提供 IBus 服务(读 `~/.config/ibus/bus/` 下的地址文件并确认其中记录的 PID 仍存活),就把 `QT_IM_MODULE` 改写为 `ibus`。检测不到就原样放行,不会影响已经配好的环境。
+这里有个坑。Qt 的 ibus 插件在建立任何连接之前,会先检查 **`ibus-daemon` 可执行文件是否在 `PATH` 上**:
+
+```cpp
+valid = !QStandardPaths::findExecutable("ibus-daemon", {}).isEmpty();
+if (!valid)
+    return;
+```
+
+只装了 fcitx5 的桌面上没有这个文件,插件会静默自我禁用,Qt 转而回退到 compose 上下文——没有预编辑、没有候选词框。设置 `IBUS_USE_PORTAL` 可以走 portal 分支跳过该检查,对端服务名换成 `org.freedesktop.portal.IBus`,这个名字同样由 fcitx5 的 ibusfrontend 持有。
+
+启动时 `memo/core/input_method.py` 就做这两件事:如果 `QT_IM_MODULE` 是 `fcitx`/`fcitx5`,且检测到有进程正在提供 IBus 服务(读 `~/.config/ibus/bus/` 下的地址文件并确认其中记录的 PID 仍存活),把 `QT_IM_MODULE` 改写为 `ibus`;若 `ibus-daemon` 不在 `PATH` 上,再补设 `IBUS_USE_PORTAL=1`。检测不到 IBus 服务就原样放行,用户显式设过的 `IBUS_USE_PORTAL` 也不会被覆盖。
 
 因此:
 
@@ -69,7 +79,14 @@ Ignoring QPA plugin due to mismatching Qt versions 396032 394240
 QT_LOGGING_RULES="qt.qpa.input.methods=true" ./dist/Memo
 ```
 
-正常会输出 `socketWatcher.addPath ".../ibus/bus/<machine-id>-unix-0"`,该文件里的 `IBUS_DAEMON_PID` 就是 fcitx5 的进程号。
+连接成功时会看到这两行:
+
+```text
+qt.qpa.input.methods: use IBus portal
+qt.qpa.input.methods: >>>> bus connected!
+```
+
+只有 `socketWatcher.addPath` 而没有 `bus connected!`,说明插件自我禁用了——通常是 `IBUS_USE_PORTAL` 没生效。
 
 ## 测试
 

@@ -38,6 +38,45 @@ def test_configure_routes_fcitx_to_ibus_when_frontend_is_live(tmp_path, monkeypa
 
 
 @linux_only
+def test_configure_forces_the_portal_when_ibus_daemon_is_absent(tmp_path, monkeypatch):
+    """Qt's ibus plugin returns before connecting unless ibus-daemon is on
+    PATH, so a fcitx5-only desktop needs the portal branch."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("QT_IM_MODULE", "fcitx")
+    monkeypatch.delenv("IBUS_USE_PORTAL", raising=False)
+    monkeypatch.setattr(input_method.shutil, "which", lambda _name: None)
+    _write_bus_file(tmp_path, os.getpid())
+
+    assert input_method.configure() == "ibus"
+    assert os.environ["IBUS_USE_PORTAL"] == "1"
+
+
+@linux_only
+def test_configure_leaves_the_normal_route_when_ibus_daemon_exists(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("QT_IM_MODULE", "fcitx")
+    monkeypatch.delenv("IBUS_USE_PORTAL", raising=False)
+    monkeypatch.setattr(input_method.shutil, "which", lambda _name: "/usr/bin/ibus-daemon")
+    _write_bus_file(tmp_path, os.getpid())
+
+    assert input_method.configure() == "ibus"
+    assert "IBUS_USE_PORTAL" not in os.environ
+
+
+@linux_only
+def test_configure_never_clobbers_an_explicit_portal_choice(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("QT_IM_MODULE", "fcitx")
+    monkeypatch.setenv("IBUS_USE_PORTAL", "0")
+    monkeypatch.setattr(input_method.shutil, "which", lambda _name: None)
+    _write_bus_file(tmp_path, os.getpid())
+
+    input_method.configure()
+
+    assert os.environ["IBUS_USE_PORTAL"] == "0"
+
+
+@linux_only
 def test_configure_leaves_fcitx_alone_when_nothing_serves_ibus(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     monkeypatch.setenv("QT_IM_MODULE", "fcitx")

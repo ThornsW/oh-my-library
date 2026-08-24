@@ -15,11 +15,25 @@ addon: it takes the ``org.freedesktop.IBus`` bus name and writes the same
 address file ``ibus-daemon`` does. Asking Qt for ``ibus`` therefore still
 reaches fcitx5 — and Memo stops depending on the build machine's Qt version
 matching the user's desktop.
+
+One catch. Qt's plugin disables itself before opening any connection unless
+the *ibus-daemon executable* is on PATH::
+
+    valid = !QStandardPaths::findExecutable("ibus-daemon", {}).isEmpty();
+    if (!valid)
+        return;
+
+On a fcitx5-only desktop ibus is not installed, so the plugin silently does
+nothing and Qt falls back to the compose context — no preedit, no candidate
+window. Setting ``IBUS_USE_PORTAL`` takes the portal branch instead, which
+skips that check and talks to ``org.freedesktop.portal.IBus`` — another name
+fcitx5's ibusfrontend owns.
 """
 
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -76,4 +90,9 @@ def configure() -> str | None:
         return None
 
     os.environ["QT_IM_MODULE"] = "ibus"
+    # Mirror the check Qt's plugin makes: with no ibus-daemon on PATH it would
+    # disable itself before connecting, so take the portal branch instead.
+    # Never clobber an explicit choice by the user.
+    if "IBUS_USE_PORTAL" not in os.environ and shutil.which("ibus-daemon") is None:
+        os.environ["IBUS_USE_PORTAL"] = "1"
     return "ibus"
