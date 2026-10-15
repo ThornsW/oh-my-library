@@ -1,0 +1,19 @@
+# 只公开插件、README、LICENSE 和截图。下面这些只留在本地：
+# 开发文档和 AI 助手说明（含服务器信息、个人决定）
+AGENTS.md
+CLAUDE.md
+docs/
+# 开发站、部署和测试脚本（含服务器路径）
+dev/
+# 角色草稿和参考图
+prototype/
+# 作者自用的角色文件（小橘），不公开
+characters/
+# 打包产物（Release 用的 zip）
+dist/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+*.swp
+.DS_Store

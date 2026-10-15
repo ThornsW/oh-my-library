@@ -1,0 +1,183 @@
+/* AI 宠物：左下角的看板角色。主色来自后台设置（脚本写进 --aipet-c1 / --aipet-c2），
+ * 夜间模式由脚本按设置识别后给 #aipet 加 is-dark；角色显示宽度写进 --aipet-w。 */
+#aipet {
+	--aipet-accent: var(--aipet-c1, #1F6F54);
+	--aipet-card: #FFFFFF;
+	--aipet-text: #2B2F36;
+	--aipet-sub: #8A8F98;
+	--aipet-shadow: 0 6px 20px rgba(0, 0, 0, .12);
+	position: fixed;
+	left: 12px;
+	bottom: 0;
+	z-index: 1000;
+	width: var(--aipet-w, 192px);
+	font-size: 14px;
+	line-height: 1.6;
+	color: var(--aipet-text);
+}
+#aipet.is-dark {
+	--aipet-accent: var(--aipet-c2, #9C78E2);
+	--aipet-card: #24212E;
+	--aipet-text: #E8E6F0;
+	--aipet-sub: #9A97A8;
+	--aipet-shadow: 0 6px 20px rgba(0, 0, 0, .4);
+}
+
+/* .aipet-cat 是可点的外框（负责跳一下、躲起来），里面的 .aipet-sprite 是 canvas 或 img */
+.aipet-cat {
+	display: block;
+	width: 100%;
+	cursor: pointer;
+	outline: none;
+	transition: transform .4s cubic-bezier(.3, .7, .4, 1.15);
+	-webkit-tap-highlight-color: transparent;
+}
+.aipet-sprite {
+	display: block;
+	width: 100%;
+	height: auto;
+	pointer-events: none;
+	user-select: none;
+	-webkit-user-drag: none;
+}
+.aipet-sprite.is-pixel { image-rendering: pixelated; }
+img.aipet-sprite { transition: transform .12s linear; }
+.aipet-cat:focus-visible {
+	outline: 2px dashed var(--aipet-accent);
+	outline-offset: -4px;
+	border-radius: 10px;
+}
+.aipet.is-hop .aipet-cat { animation: aipet-hop .42s cubic-bezier(.3, .7, .4, 1); }
+@keyframes aipet-hop {
+	0%, 100% { transform: translateY(0); }
+	40% { transform: translateY(-9%); }
+}
+/* 躲起来：沉到屏幕下面，只露出耳朵尖 */
+.aipet.is-hidden .aipet-cat { transform: translateY(80%); }
+.aipet.is-hidden .aipet-panel,
+.aipet.is-hidden .aipet-close,
+.aipet.is-hidden .aipet-fx { display: none; }
+
+.aipet-panel {
+	position: absolute;
+	left: 6px;
+	bottom: calc(100% - 4px);
+	width: 260px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	pointer-events: none;
+}
+.aipet-panel > * { pointer-events: auto; }
+
+.aipet-bubble {
+	position: relative;
+	max-height: 220px;
+	overflow-y: auto;
+	padding: 8px 12px;
+	background: var(--aipet-card);
+	border: 2px solid var(--aipet-accent);
+	border-radius: 12px;
+	box-shadow: var(--aipet-shadow);
+	word-break: break-word;
+	opacity: 0;
+	visibility: hidden;
+	transform: translateY(6px);
+	transition: opacity .25s, transform .25s, visibility .25s;
+}
+.aipet-bubble.is-on { opacity: 1; visibility: visible; transform: none; }
+.aipet-bubble a { color: var(--aipet-accent); text-decoration: underline; text-underline-offset: 2px; }
+.aipet-bubble.is-thinking { color: var(--aipet-sub); }
+.aipet-bubble.is-thinking::after { content: "…"; display: inline-block; animation: aipet-dots 1s steps(3) infinite; overflow: hidden; vertical-align: bottom; width: 1.2em; }
+@keyframes aipet-dots { 0% { width: .4em; } 100% { width: 1.2em; } }
+
+.aipet-form {
+	display: none;
+	gap: 6px;
+	padding: 4px;
+	background: var(--aipet-card);
+	border: 2px solid var(--aipet-accent);
+	border-radius: 12px;
+	box-shadow: var(--aipet-shadow);
+}
+.aipet.is-chat .aipet-form { display: flex; }
+.aipet-form input {
+	flex: 1;
+	min-width: 0;
+	padding: 4px 8px;
+	border: 0;
+	background: transparent;
+	color: var(--aipet-text);
+	font: inherit;
+	outline: none;
+}
+.aipet-form input::placeholder { color: var(--aipet-sub); }
+.aipet-form button {
+	flex: none;
+	padding: 2px 12px;
+	border: 0;
+	border-radius: 8px;
+	background: var(--aipet-accent);
+	color: #FFF;
+	font: inherit;
+	cursor: pointer;
+}
+.aipet-form input:disabled + button { opacity: .5; cursor: default; }
+.aipet-notice {
+	display: none;
+	margin: 0;
+	padding: 0 6px;
+	font-size: 12px;
+	color: var(--aipet-sub);
+}
+.aipet.is-chat .aipet-notice { display: block; }
+
+.aipet-close {
+	position: absolute;
+	top: 17%;
+	right: 4px;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, .45);
+	color: #FFF;
+	font-size: 15px;
+	line-height: 22px;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity .2s;
+}
+#aipet:hover .aipet-close,
+.aipet-close:focus-visible { opacity: 1; }
+
+.aipet-fx {
+	position: absolute;
+	left: 84%;
+	font: 700 22px/1 system-ui, sans-serif;
+	pointer-events: none;
+	display: none;
+}
+.aipet-fx.is-on { display: block; animation: aipet-float 1.6s ease-in-out infinite; }
+.aipet-fx-happy { color: #F2B630; }
+.aipet-fx-surprised { color: #E5486D; }
+.aipet-fx-sleepy { color: #8C93B8; font-size: 18px; }
+@keyframes aipet-float {
+	0%, 100% { transform: translateY(0); opacity: 1; }
+	50% { transform: translateY(-6px); opacity: .55; }
+}
+
+@media (max-width: 768px) {
+	#aipet { left: 4px; width: calc(var(--aipet-w, 192px) / 2); font-size: 13px; }
+	.aipet-panel { width: min(240px, calc(100vw - 16px)); left: 2px; }
+	.aipet-close { opacity: 1; right: 0; width: 18px; height: 18px; font-size: 12px; line-height: 18px; }
+	.aipet-fx { font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.aipet-cat, .aipet-bubble, img.aipet-sprite { transition: none; }
+	.aipet.is-hop .aipet-cat, .aipet-fx.is-on, .aipet-bubble.is-thinking::after { animation: none; }
+}
+@media print {
+	#aipet { display: none; }
+}
