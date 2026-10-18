@@ -1,0 +1,27 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# 虚拟环境（某个程序用 venv 时）
+.venv/
+venv/
+
+# 密钥：忽略 .env，但保留示例文件
+.env
+!.env.example
+
+# 日志
+*.log
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.claude/
+.codex/
+
+AGENTS.md
