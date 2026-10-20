@@ -206,7 +206,8 @@ class Pipeline:
             err = StageError(Stage.RECORD, f"录音太短（{recording.seconds:.1f} 秒）")
         elif recording.peak_db < float(self.cfg["silence_threshold_db"]):
             err = StageError(Stage.RECORD, f"没有录到声音（最大音量 {recording.peak_db:.0f} dB）："
-                             "检查 UU 远程麦克风是否开启、VMware 声卡是否已连接")
+                             "检查麦克风是否开启、系统默认录音设备是否正确；"
+                             "远程桌面或虚拟机里要确认声音已转发进来")
         if err:
             self._set(u, State.FAILED, err)
             self.notice.emit("error", str(err))
