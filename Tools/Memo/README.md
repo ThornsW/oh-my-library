@@ -1,5 +1,7 @@
 # Memo
 
+版本:0.1.1
+
 Memo 是一个本地桌面待办和 Markdown 笔记应用。它使用 PySide6 构建界面,SQLite 保存数据,常驻系统托盘,当前主要维护 Linux 和 Windows。
 
 ## 功能
@@ -19,9 +21,10 @@ Memo 是一个本地桌面待办和 Markdown 笔记应用。它使用 PySide6 �
 
 ## 环境要求
 
-- Miniforge 或 Mambaforge
+- Miniforge 或 Mambaforge;本仓库默认用 `GeneralDev` 环境
 - Python 3.11 或更高
-- PySide6 6.4 或更高
+- PySide6 6.4 或更高;完整依赖见 `requirements.txt`(运行)和 `requirements-dev.txt`(测试、打包)
+- 桌面环境要提供系统托盘(见下文「已知限制」)
 - Linux 中文输入:运行的桌面上有 fcitx5(默认启用 ibusfrontend)或 ibus
 - Windows 全局快捷键:依赖 `pynput`
 
@@ -29,18 +32,45 @@ Memo 是一个本地桌面待办和 Markdown 笔记应用。它使用 PySide6 �
 
 ## 从源码运行
 
+克隆 oh-my-library 后进入本目录:
+
 ```bash
-git clone <repo-url> Memo
-cd Memo
+cd Tools/Memo
+```
 
-mamba create -n memo -c conda-forge -y python=3.11 \
-  pyside6 qt6-main platformdirs pynput pytest pyinstaller
-mamba activate memo
+用 `GeneralDev` 环境(依赖已装好):
 
+```bash
+mamba activate GeneralDev
+pip install -e . --no-deps
 python -m memo
 ```
 
-当前仓库没有提交 `environment.yml`;依赖以 `pyproject.toml` 和上面的 mamba 命令为准。
+用其他环境时先装依赖,再安装本程序。conda 环境:
+
+```bash
+mamba create -n memo -c conda-forge -y python=3.11 \
+  pyside6 qt6-main platformdirs pynput pytest pyinstaller
+mamba activate memo
+pip install -e . --no-deps
+```
+
+纯 pip / venv:
+
+```bash
+pip install -r requirements-dev.txt
+pip install -e .
+```
+
+`pip install -e .` 这一步不能省:开机自启写入的启动命令是 `python -m memo`,没安装时登录后会找不到 `memo` 模块。
+
+依赖清单:`requirements.txt` 是运行依赖,`requirements-dev.txt` 另加测试和打包工具,两者和 `pyproject.toml` 保持一致。
+
+## 已知限制
+
+- **必须有系统托盘**。没有托盘时程序会弹窗提示后退出。原版 GNOME(例如 Fedora)要先装 AppIndicator 扩展;Ubuntu、KDE、Windows 自带托盘。
+- **Linux 下全局快捷键只在 X11 会话可用**。Wayland 下可以在系统设置里给 `python -m memo` 绑一个快捷键:Memo 只运行一份,再次启动会把已有窗口唤到前台。Windows 不受影响。
+- Windows 打包脚本没有在维护者的机器上验证过,遇到问题欢迎反馈。
 
 ## Linux 中文输入
 
@@ -91,8 +121,10 @@ qt.qpa.input.methods: >>>> bus connected!
 ## 测试
 
 ```bash
-mamba run -n memo pytest -q
+mamba run -n GeneralDev pytest -q
 ```
+
+在本目录运行;也可以在仓库根目录运行 `pytest Tools/Memo/tests`。
 
 测试覆盖数据库、设置、开机自启、全局快捷键导入、图标、打包规则,以及新建待办对话框和标签右键菜单。
 
@@ -148,4 +180,5 @@ tests/              # pytest 测试
 scripts/            # 打包脚本
 Memo.spec           # PyInstaller 配置
 pyproject.toml      # 包元数据和运行依赖
+requirements*.txt   # 依赖清单(运行 / 开发)
 ```

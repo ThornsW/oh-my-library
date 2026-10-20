@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memo"
-version = "0.1.0"
+version = "0.1.1"
 description = "Cross-platform desktop memo / sticky-note app for tracking todos with Markdown notes"
 # Chinese input reaches fcitx5 over the IBus protocol instead of the distro's
 # fcitx5 Qt plugin, so the bundled Qt no longer has to match the user's desktop
@@ -25,6 +25,11 @@ memo = "memo.app:main"
 
 [tool.setuptools.packages.find]
 include = ["memo*"]
+
+# Non-Python files the app loads at runtime; without this `pip install .`
+# ships no stylesheet and the UI falls back to the unstyled default.
+[tool.setuptools.package-data]
+memo = ["resources/*.qss"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

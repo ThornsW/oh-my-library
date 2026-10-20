@@ -28,6 +28,8 @@ from memo.core import paths
 
 
 _AUTH_KEY = b"memo-local-only"
+# Raw bytes, not pickled objects: the listener never unpickles what a peer sends.
+_WAKE = b"show"
 
 
 def _address() -> str:
@@ -73,7 +75,7 @@ def _try_signal(addr: str) -> bool:
     except (ConnectionRefusedError, FileNotFoundError, OSError):
         return False
     try:
-        client.send("show")
+        client.send_bytes(_WAKE)
     finally:
         try:
             client.close()
@@ -123,7 +125,7 @@ class Singleton:
             except OSError:
                 return
             try:
-                msg = conn.recv()
+                msg = conn.recv_bytes(maxlength=64)
             except (EOFError, OSError):
                 msg = None
             finally:
@@ -131,7 +133,7 @@ class Singleton:
                     conn.close()
                 except OSError:
                     pass
-            if msg == "show" and self._on_signal is not None:
+            if msg == _WAKE and self._on_signal is not None:
                 try:
                     self._on_signal()
                 except Exception:

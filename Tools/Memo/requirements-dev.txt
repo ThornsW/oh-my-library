@@ -1,0 +1,4 @@
+# 测试和打包另需的工具（pytest 对应 pyproject.toml 的 [dev]）
+-r requirements.txt
+pytest>=8.0
+pyinstaller>=6

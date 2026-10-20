@@ -1,0 +1,5 @@
+# Memo 的运行依赖（和 pyproject.toml 的 dependencies 保持一致）
+# conda 环境建议用 mamba 安装（见 README），这里供 pip / venv 使用。
+PySide6>=6.4
+platformdirs>=4.0
+pynput>=1.7

@@ -125,7 +125,8 @@ def test_tag_sidebar_context_menu_requests_new_todo_under_that_tag(db, qapp):
 def test_main_window_new_action_uses_full_new_todo_dialog():
     from pathlib import Path
 
-    source = Path("memo/ui/main_window.py").read_text(encoding="utf-8")
+    root = Path(__file__).resolve().parents[1]
+    source = (root / "memo" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
     assert "QInputDialog" not in source
     assert "NewTodoDialog" in source

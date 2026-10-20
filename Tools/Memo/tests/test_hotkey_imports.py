@@ -3,10 +3,13 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
 from memo.core import hotkey
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_validate_rejects_an_unparsable_combo() -> None:
@@ -23,9 +26,7 @@ def test_validate_accepts_the_default_combo() -> None:
 def test_settings_dialog_reuses_the_shared_validator() -> None:
     """The dialog used to re-implement parsing and its own ImportError /
     ValueError handling; keep it on the one code path."""
-    from pathlib import Path
-
-    source = Path("memo/ui/settings_dialog.py").read_text(encoding="utf-8")
+    source = (ROOT / "memo" / "ui" / "settings_dialog.py").read_text(encoding="utf-8")
 
     assert "hotkey.validate" in source
     assert "from pynput" not in source
@@ -42,7 +43,7 @@ def test_app_modules_import_without_display() -> None:
             "-c",
             "import memo.app; import memo.ui.settings_dialog",
         ],
-        cwd=os.getcwd(),
+        cwd=ROOT,
         env=env,
         text=True,
         capture_output=True,
