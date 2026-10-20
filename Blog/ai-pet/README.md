@@ -1,6 +1,6 @@
 # AI 宠物 · 会聊天的看板角色
 
-版本：0.4.0
+版本：0.4.1
 
 给 WordPress 博客左下角加一个会聊天的看板角色。访客点它就能聊天，它会根据访客正在看的页面和全站文章推荐站内内容。聊天后端可以是任意 OpenAI 兼容接口。**角色自备**：上传几张图片，或者放一个 JS 角色文件，都可以让 AI 帮你生成。
 
@@ -45,8 +45,8 @@ cp -r Blog/ai-pet/plugin/ai-pet /path/to/wordpress/wp-content/plugins/
 ```bash
 cd Blog/ai-pet/plugin
 mkdir -p ../dist
-zip -qr ../dist/ai-pet-0.4.0.zip ai-pet -x "*.md"
-unzip -l ../dist/ai-pet-0.4.0.zip   # 检查：顶层目录是 ai-pet/，里面只有插件文件
+zip -qr ../dist/ai-pet-0.4.1.zip ai-pet -x "*.md"
+unzip -l ../dist/ai-pet-0.4.1.zip   # 检查：顶层目录是 ai-pet/，里面只有插件文件
 ```
 
 然后在后台「插件 → 安装插件 → 上传插件」里选择这个 zip，再启用。`dist/` 已在 `.gitignore` 中。
@@ -197,7 +197,7 @@ Q 版的<你的角色，例如：戴蓝色围巾的白色小狗>，从画面底�
 
 ## 可选：看番清单联动
 
-如果同时装了 [Bangumi List 看番清单](https://github.com/ThornsW/bangumi-list) 插件，站点目录里会加上番剧清单（番名、观看方式、评分、评语）。这样角色就能推荐番剧，访客打开看番页时也会说专门的台词。没装的话，这部分自动跳过。
+如果同时装了 [Bangumi List 看番清单](https://github.com/ThornsW/oh-my-library/tree/main/Blog/bangumi-list) 插件，站点目录里会加上番剧清单（番名、观看方式、评分、评语）。这样角色就能推荐番剧，访客打开看番页时也会说专门的台词。没装的话，这部分自动跳过。
 
 ## 常见问题
 
