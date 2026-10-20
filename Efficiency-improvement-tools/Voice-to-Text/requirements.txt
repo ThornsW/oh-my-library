@@ -1,0 +1,11 @@
+# Voice-to-Text 的 Python 依赖
+#
+# 只有一个：PyGObject（GTK 3 的 Python 接口）。
+# 推荐直接用 Ubuntu 系统自带的版本，不用 pip 安装：
+#   sudo apt install python3-gi gir1.2-gtk-3.0
+# 只有在用其他 Python 环境运行时才需要 pip install -r requirements.txt，
+# 那样还需要先装 GTK 3 和 gobject-introspection 的开发包。
+#
+# 非 Python 依赖（系统命令）见 README「适用环境与限制」：
+#   xdotool xclip pipewire-bin x11-utils，构建单文件程序另需 gcc
+PyGObject>=3.42

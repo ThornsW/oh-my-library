@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "active_provider": "千问 qwen3-asr-flash（OpenAI 兼容）",
+  "providers": [
+    {
+      "name": "千问 qwen3-asr-flash（OpenAI 兼容）",
+      "protocol": "openai_chat_audio",
+      "base_url": "https://maas.qianwenaiapi.com/compatible-mode/v1",
+      "model": "qwen3-asr-flash",
+      "api_key": "",
+      "audio_format": "data_uri",
+      "extra_json": "{\"asr_options\": {\"enable_itn\": false}}"
+    },
+    {
+      "name": "千问 DashScope 原生（同步）",
+      "protocol": "dashscope_native",
+      "base_url": "https://maas.qianwenaiapi.com/api/v1",
+      "model": "qwen3-asr-flash",
+      "api_key": "",
+      "audio_format": "data_uri",
+      "extra_json": "{\"parameters\": {\"asr_options\": {\"enable_itn\": false}}}"
+    },
+    {
+      "name": "OpenAI Whisper（标准转写）",
+      "protocol": "openai_transcriptions",
+      "base_url": "https://api.openai.com/v1",
+      "model": "whisper-1",
+      "api_key": "",
+      "audio_format": "data_uri",
+      "extra_json": ""
+    }
+  ],
+  "language": "",
+  "context": "Codex, Claude, Claude Code, Ubuntu, API, CLI, GitHub, Python",
+  "replacements": "",
+  "strip_trailing_period": false,
+  "request_timeout_s": 30,
+  "audio_device": "",
+  "min_seconds": 0.4,
+  "tail_ms": 1000,
+  "max_seconds": 180,
+  "silence_threshold_db": -50.0,
+  "auto_paste": true,
+  "auto_enter": false,
+  "paste_keys": "ctrl+shift+v",
+  "enter_keys": "Return",
+  "delay_before_paste_ms": 60,
+  "delay_before_enter_ms": 300,
+  "target_mode": "fixed",
+  "target_window": 0,
+  "target_title": "",
+  "floating_visible": true,
+  "floating_pos": null,
+  "main_on_top": false,
+  "font_pt": 13
+}

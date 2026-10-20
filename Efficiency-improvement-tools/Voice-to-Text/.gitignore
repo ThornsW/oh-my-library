@@ -1,0 +1,13 @@
+# Local settings (holds API keys in plain text)
+config.json
+config.json.tmp
+# Runtime output
+logs/
+cache/
+# Python
+__pycache__/
+*.pyc
+
+# Single-file build output (./build.sh)
+/voice-to-text
+/voice-to-text.tmp
