@@ -1,0 +1,14 @@
+# 开发环境产物
+dev/*.log
+dev/wp-data/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# 只留本地：AI 助手说明、开发站和部署脚本、生产运维记录（含服务器信息）
+AGENTS.md
+dev/
+docs/production-operations.md
