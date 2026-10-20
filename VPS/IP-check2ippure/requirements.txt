@@ -1,0 +1,7 @@
+# IP-check2ippure 的 Python 依赖
+#
+# 没有第三方包：只用 Python 3.10+ 标准库，不需要 pip install。
+# 本仓库默认用 miniforge 的 GeneralDev 环境（Python 3.12）。
+#
+# 非 Python 依赖：mihomo（clash-meta）。首次运行自动下载到 bin/，
+# 也可以用 --mihomo 或环境变量 MIHOMO_BIN 指定本地文件，见 README。

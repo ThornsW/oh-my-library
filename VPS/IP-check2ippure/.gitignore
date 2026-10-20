@@ -5,10 +5,15 @@ results/*
 __pycache__/
 *.pyc
 
-# 设计文档/实现计划含本机私有信息（路由器口令、机场地址、绝对路径等），仅本地保留，不公开
-docs/
+# 历史设计文档/实现计划含本机私有信息，仅本地保留；精简维护指南可提交
+docs/*
+!docs/agent-guide.md
 
 # 编辑器 / 操作系统产物
 .vscode/
 .idea/
 .DS_Store
+
+# 本地密钥和 AI 助手说明，不公开
+.env
+AGENTS.md

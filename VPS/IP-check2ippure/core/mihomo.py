@@ -60,8 +60,8 @@ class MihomoController:
                 pass
             time.sleep(1.5)
         raise RuntimeError(
-            "60s 内订阅节点列表为空：① 确认 PassWall 已关闭（多数机场拒绝代理 IP 拉取订阅，"
-            "会返回“请关闭网络代理后再获取订阅”）；② 订阅 URL 是否有效；③ UA 是否需调整")
+            "60s 内订阅节点列表为空：① 确认透明/系统代理（如 PassWall）已关闭（多数机场拒绝代理 IP 拉取订阅，"
+            "会返回“请关闭网络代理后再获取订阅”）；② 订阅 URL 是否有效；③ UA 是否需调整（--ua）")
 
     def switch(self, node: str, group: str = GROUP_NAME) -> None:
         api_put(self.base + "/proxies/" + urllib.parse.quote(group), {"name": node}, secret=self.secret, timeout=5)
