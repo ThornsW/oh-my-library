@@ -1,5 +1,7 @@
 # AI 宠物 · 会聊天的看板角色
 
+版本：0.4.0
+
 给 WordPress 博客左下角加一个会聊天的看板角色。访客点它就能聊天，它会根据访客正在看的页面和全站文章推荐站内内容。聊天后端可以是任意 OpenAI 兼容接口。**角色自备**：上传几张图片，或者放一个 JS 角色文件，都可以让 AI 帮你生成。
 
 > A WordPress plugin that adds a chatty mascot to the bottom-left corner of your blog. Visitors can chat with it, and it recommends posts from your own site. Works with any OpenAI-compatible API. Bring your own character (images or a JS sprite file). UI and prompts are in Chinese.
@@ -30,20 +32,26 @@
 
 ## 安装
 
-### 推荐：下载 Release
+插件目录必须叫 `ai-pet`。插件代码在 oh-my-library 仓库的 `Blog/ai-pet/plugin/ai-pet/`，只有这个目录需要放进 WordPress。
 
-去 **[Releases](https://github.com/ThornsW/ai-pet/releases/latest)** 下载 `ai-pet-x.y.z.zip`，在后台「插件 → 安装插件 → 上传插件」里选择它，然后启用。
-
-> ⚠️ 不要用仓库主页的「Download ZIP」或 Release 页面的「Source code」：插件在仓库的 `plugin/ai-pet/` 子目录里，那两个压缩包直接上传是装不上的。
-
-### 从源码安装
-
-插件目录必须叫 `ai-pet`：
+### 直接拷贝
 
 ```bash
-git clone https://github.com/ThornsW/ai-pet.git
-cp -r ai-pet/plugin/ai-pet /path/to/wordpress/wp-content/plugins/
+cp -r Blog/ai-pet/plugin/ai-pet /path/to/wordpress/wp-content/plugins/
 ```
+
+### 打成 zip，在后台上传
+
+```bash
+cd Blog/ai-pet/plugin
+mkdir -p ../dist
+zip -qr ../dist/ai-pet-0.4.0.zip ai-pet -x "*.md"
+unzip -l ../dist/ai-pet-0.4.0.zip   # 检查：顶层目录是 ai-pet/，里面只有插件文件
+```
+
+然后在后台「插件 → 安装插件 → 上传插件」里选择这个 zip，再启用。`dist/` 已在 `.gitignore` 中。
+
+> ⚠️ 不要直接上传整个仓库的压缩包（例如 GitHub 的「Download ZIP」）：插件在 `plugin/ai-pet/` 子目录里，那样装不上。
 
 ## 配置
 
@@ -84,6 +92,8 @@ cp -r ai-pet/plugin/ai-pet /path/to/wordpress/wp-content/plugins/
 | 动画 | 探头、呼吸起伏、按表情换图；有「说话」「眨眼」图时会动嘴、眨眼 | 由你画的每一帧决定：眨眼、看向鼠标、抖耳朵、说话动嘴…… |
 
 有 JS 角色文件时优先用它，图片不生效。
+
+**想先看看效果**：仓库里的 [`examples/character.example.js`](examples/character.example.js) 是一个最小的方块脸角色，按下面「方式二」上传到 `wp-content/uploads/ai-pet/character.js` 就能用，也可以在它的基础上改。
 
 ### 方式一：图片
 
