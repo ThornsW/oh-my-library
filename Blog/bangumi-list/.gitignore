@@ -1,0 +1,21 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# logs / temp
+*.log
+/tmp/
+
+# 本地数据(不要提交个人番剧数据与封面)
+/data/
+/examples/*.local.json
+# tools/fetch-covers-local.py 的默认产出
+/covers/
+/anime-list.json
+
+# python
+__pycache__/
+*.pyc
