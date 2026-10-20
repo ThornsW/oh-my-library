@@ -1,39 +1,31 @@
 # Bangumi List 看番清单
 
-一个给 WordPress 加「看番清单」页面的独立插件:后台像写文章一样记录看过的番(封面 / 评分 / 评语),前台用**终端风海报网格**展示,风格与博客文章完全隔离。
+版本：0.5.3
 
-版本:0.5.3
+WordPress 插件：后台像写文章一样记录看过的番（封面、评分、评语），前台用终端风的海报网格展示，样式和主题互不影响。
 
 > A WordPress plugin that adds a terminal-styled anime watch-list page. Manage entries in wp-admin, render anywhere with the `[anime_list]` shortcode.
 
 ![看番清单前台效果](docs/screenshot.png)
 
-<p align="center"><sub>前台效果 · 短代码 <code>[anime_list]</code> · 图为 <a href="https://thornsw.cn/anime">thornsw.cn/anime</a></sub></p>
+<p align="center"><sub>短代码 <code>[anime_list]</code> 的前台效果，图为 <a href="https://thornsw.cn/anime">thornsw.cn/anime</a></sub></p>
 
 ## 特性
 
-- 注册「动漫」内容类型(CPT `anime`),后台增删改,自带列表 / 编辑界面(特色图当封面)
-- 每部番:番名、封面、评分(只写数字如 `9.7`;也能写"不做评价"这种自由文本)、评语、观看方式、Bangumi 链接
-- 前台短代码 `[anime_list]`:终端窗口外壳 + 海报网格,**评级徽章**(按评分折算五档,分色)+ 进度条 + 观看方式 + 评分,悬停(桌面)/ 点按(移动)看评语
-- 填了 Bangumi 链接的卡片可点击跳转;桌面直接点卡片,移动端点评语层里的「bgm ↗」
-- 前端搜索(番名 + 评语)+ 按评分 / 最近添加排序,纯 JS,无需翻页
-- 封面可自动抓取(mikan / Bangumi,带比例校验挡掉横版图),或后台手动上传;抓不到自动用「文字卡」占位
-- 样式作用域化(`.bgm-*`),不污染主题;复用等宽字体(推荐 Maple Mono NF CN)
-- 标题、副标题、终端用户名、主题色均可通过短代码属性自定义
+- 注册「动漫」内容类型，每部番可以记番名、封面、评分、评语、观看方式和 Bangumi 链接
+- 评分按五档显示评级徽章；悬停或点按卡片看评语；填了链接的卡片可以跳转到 Bangumi
+- 前端搜索，可按评分或最近添加排序，不用翻页
+- 封面可以从 mikan / Bangumi 自动抓取，并过滤掉横版图；抓不到时用文字卡占位
+- 样式都限定在 `.bgm-*` 下，不影响主题
 
 ## 要求
 
-- WordPress 5.8+
-- PHP 7.4+
-- (可选)WP-CLI —— 用于批量导入 / 自动抓封面
+- WordPress 5.8+，PHP 7.4+
+- 可选：WP-CLI，用来批量导入和抓封面
 
 ## 安装
 
-插件目录必须叫 `bangumi-list`,否则和文档、日后的更新机制对不上。
-
-### 从本仓库拷贝运行文件
-
-本插件位于 oh-my-library 仓库的 `Blog/bangumi-list/`。只把运行时文件拷进 WordPress:`docs/`、`tools/`、`examples/` 是开发用的,不要上传(Nginx 等会把 `.md` 原样公开)。
+插件目录必须叫 `bangumi-list`。只拷运行需要的文件；`docs/`、`tools/`、`examples/` 不要上传，Nginx 会把 `.md` 原样公开。
 
 ```bash
 cd Blog/bangumi-list
@@ -41,7 +33,7 @@ mkdir -p /path/to/wp-content/plugins/bangumi-list
 cp -r bangumi-list.php includes assets cli LICENSE /path/to/wp-content/plugins/bangumi-list/
 ```
 
-想在后台「插件 → 安装插件 → 上传插件」里装,就先打成 zip(zip 里的顶层目录必须是 `bangumi-list/`):
+想在后台「上传插件」里安装，就先打成 zip，顶层目录必须是 `bangumi-list/`：
 
 ```bash
 cd Blog
@@ -49,198 +41,120 @@ zip -qr ~/bangumi-list.zip bangumi-list/bangumi-list.php bangumi-list/includes \
   bangumi-list/assets bangumi-list/cli bangumi-list/LICENSE
 ```
 
-### 旧版本
-
-每个版本都在本仓库的提交历史里,提交说明带版本号。在仓库根目录用 `git log --oneline -- Blog/bangumi-list` 找到对应提交,再打包(把 `<提交号>` 和文件名里的版本号换掉):
+**旧版本**：在仓库根目录运行 `git log --oneline -- Blog/bangumi-list`，找到提交说明里带对应版本号的提交，再打包：
 
 ```bash
 git archive --format=zip --prefix=bangumi-list/ -o ~/bangumi-list-0.4.0.zip \
   <提交号>:Blog/bangumi-list bangumi-list.php includes assets cli LICENSE
 ```
 
-得到的 zip 在后台上传即可。
+装好之后：
 
-### 装好之后
+1. 在后台「插件」里启用 **Bangumi List 看番清单**
+2. 新建一个页面，内容写短代码 `[anime_list]`，建议用全宽页面模板
+3. 在后台「看番」里添加番剧，「特色图」就是封面
 
-1. 后台「插件」启用 **Bangumi List 看番清单**
-2. 新建一个页面,内容写上短代码 `[anime_list]`,发布(建议用全宽 / 空白页面模板)
-3. 后台左侧「看番」里添加番剧,设置「特色图」当封面
+## 短代码
 
-## 短代码用法
-
-`[anime_list]`,可选属性:
+`[anime_list]`，可选属性：
 
 | 属性 | 说明 | 默认 |
 |---|---|---|
-| `title` | 页面大标题 | `看番清单` |
-| `subtitle` | 副标题一行 | `# 记录看过的番、我的评分与短评` |
-| `handle` | 终端标题栏用户名 | `user@blog` |
+| `title` | 大标题 | `看番清单` |
+| `subtitle` | 副标题 | `# 记录看过的番、我的评分与短评` |
+| `handle` | 终端标题栏里的用户名 | `user@blog` |
 | `path` | 终端路径标签 | `~/anime` |
-| `accent` | 主题强调色(hex) | `#7ee787` |
+| `accent` | 强调色（hex） | `#7ee787` |
 
-例:`[anime_list title="我的番剧" handle="me@site" accent="#22d3ee"]`
+例：`[anime_list title="我的番剧" handle="me@site" accent="#22d3ee"]`
 
-## 批量导入(WP-CLI)
-
-JSON 格式(见 `examples/sample-anime.json`):
-
-```json
-[{ "title": "番名", "rating": "9.7", "review": "评语", "watch_mode": "常规" }]
-```
-
-`rating` 只写数字即可,前台统一显示成 `x.x`(填 `7` 显示 `7.0`)。写成 `9.7/10` 也认(渲染时会归一)。
-
-导入:
+## 批量导入（WP-CLI）
 
 ```bash
 wp bangumi import /path/to/anime.json
 ```
 
-- 幂等:按番名判重,重复执行安全
-- 自动跳过"没看成"条目(评分和评语都空,或含「看不了 / G了」)
-- 从 Excel 转 JSON 可参考 `examples/xlsx_to_json.py`
+JSON 格式参考 `examples/sample-anime.json`：
+
+```json
+[{ "title": "番名", "rating": "9.7", "review": "评语", "watch_mode": "常规" }]
+```
+
+- 按番名判重，重复执行也安全
+- 评分和评语都为空，或者含「看不了 / G了」的条目会跳过
+- 从 Excel 转 JSON 可以参考 `examples/xlsx_to_json.py`（需要 `openpyxl`）
+- 评分写 `9.7` 或 `9.7/10` 都可以。想把旧数据里的 `/10` 去掉，运行 `wp bangumi normalize-ratings`，可以先加 `--dry-run` 看会改什么
 
 ## 封面
 
-三种方式,按推荐度排列。
+有三种方式：
 
-### 1. 本机抓好再入库(覆盖率和画质最好)
+1. **在本机抓好再入库**。覆盖率最好，也适合服务器访问不了 mikan 的情况：
+   ```bash
+   # 在服务器上导出番名
+   wp post list --post_type=anime --post_status=publish --format=json --fields=ID,post_title > anime-list.json
+   # 在本机抓图。只用 Python 3.7+ 标准库；需要代理时加 --proxy 或设 HTTPS_PROXY
+   python3 tools/fetch-covers-local.py anime-list.json -o covers/
+   # 传回服务器入库。可以加 --dry-run 预览，加 --overwrite 覆盖已有封面
+   scp -r covers/ <your-server>:/tmp/covers
+   ssh <your-server> 'wp bangumi import-covers /tmp/covers'
+   ```
+   常用参数：`--source mikan|bgm|both`、`--limit N`、`--delay`、`--proxy`。中断后重跑会跳过已经抓到的。
+2. **在服务器上直接抓**，前提是服务器能访问 `api.bgm.tv`：先用 `wp bangumi fetch-covers --limit=10` 试一下，确认没问题再去掉 `--limit` 跑全部
+3. **手动**：编辑番剧时设置「特色图」
 
-`tools/fetch-covers-local.py` 在你自己的机器上跑 —— **mikan 优先、bgm 兜底**,产出图片目录和
-`manifest.json`,再传到服务器入库。适合服务器网络受限的情况(比如连不通 mikanani.me)。
+抓取时有两道过滤，结果都写进 `manifest.json`：
 
-只依赖 Python 3 标准库,不用装 requests / Pillow。
+- **比例**：默认只收宽 / 高在 `0.5–0.8` 之间的竖版图。前台的海报框是 3:4，横版图会被裁掉一半
+- **标题比对**：搜索结果和番名对不上的跳过。某个图源只返回一条结果时会照样收下，但标成 `low_confidence`，结尾单独列出来，**务必核对**
 
-```bash
-# ① 服务器上导出番名列表
-wp post list --post_type=anime --post_status=publish \
-   --format=json --fields=ID,post_title > anime-list.json
+另外注意：
 
-# ② 本机抓图(HTTP(S)_PROXY 环境变量会被自动采用,也可 --proxy 显式指定)
-python3 tools/fetch-covers-local.py anime-list.json -o covers/
-
-# ③ 回传并入库(源文件只读不删,可反复跑)
-scp -r covers/ <your-server>:/tmp/covers
-ssh <your-server> 'wp bangumi import-covers /tmp/covers'
-```
-
-`import-covers` 支持 `--dry-run` 先看会做什么、`--overwrite` 覆盖已有封面。
-
-抓取端会做两道过滤,结果都写进 `manifest.json` 备查:
-
-- **比例闸**(默认宽/高 `0.5–0.8`):挡掉横版主视觉图,见下方「关于比例闸」
-- **标题比对**:搜索结果和番名对不上的跳过;若某图源只返回唯一一条结果,则收下但标记
-  `low_confidence`,并在结尾单独列出来提醒你核对(各站译名常常不同,例如「金色时光」
-  在 mikan 叫「青春纪行」)
-
-常用开关:`--source mikan|bgm|both`、`--limit N`、`--ratio-min/--ratio-max`、`--min-width`、
-`--delay`(请求间隔,默认 0.8s,低于 0.3s 会被强制抬回)、`--proxy`。中断后重跑会自动跳过已抓到的。
-
-**开跑前会先探一次图源**(约 10 秒):连不通的自动禁用,两个都不通就直接报错退出并提示配代理 ——
-不加这道探测的话,图源被墙时 60 部要空转约两小时且一无所获。确实要跳过就加 `--no-preflight`。
-
-### 用之前要知道的几个限制
-
-- **网络**:`mikanani.me`、`api.bgm.tv` 在不少网络环境下需要代理。用 `--proxy http://127.0.0.1:7890`
-  或设 `HTTPS_PROXY` 环境变量。
-- **译名不一致会误判**:各站中文译名常常不同(「金色时光」在 mikan 叫「青春纪行」)。脚本对
-  「某图源只返回唯一一条结果」的情况会放宽标题门槛并标 `low_confidence`,**结尾会单独列出来 ——
-  务必过一眼**。实测确实出现过张冠李戴(「嗜血狂袭」匹配到无关的「翡翠森林狼与羊」)。
-- **繁体标题**:不做繁简转换,繁体番名可能匹配不上,手动改成简体再跑即可。
-- **标题带自加后缀**:`第一季`/`系列`/`一二季`/`-电影` 会自动剥离后重搜;但清单里的错别字
-  (如「掘与宫村」应为「堀」)只能自己改。
-- **抓不到不会破坏现状**:MISS 的条目 `import-covers` 会跳过,原有封面保持不动。
-- **媒体库会累积**:导入生成新附件,被替换掉的旧图仍留在媒体库里(方便回滚),需要的话自行清理。
-- 需要 **Python 3.7+**,只用标准库。
-
-### 2. 服务器直抓(需能访问 `api.bgm.tv`)
-
-```bash
-wp bangumi fetch-covers --limit=10     # 先试 10 部,核对匹配
-wp bangumi fetch-covers                # 全部
-wp bangumi fetch-covers --overwrite    # 连已有封面也重抓
-```
-
-同样会逐个试搜索结果、过比例闸,第一个合格的才收下。封面下载进你的媒体库(不盗链),
-匹配不到的保持文字卡占位。
-
-> ⚠️ 部分服务器(尤其某些地区的云主机)可能因 DNS 污染 / 网络原因访问不到 `api.bgm.tv`,
-> 此时 `fetch-covers` 会全部 MISS,请改用方式 1 或方式 3。
-
-### 3. 手动
-
-后台编辑番 → 设「特色图」。
-
-### 关于比例闸
-
-前台海报框是固定的 3:4 + `object-fit:cover`,横版图进去会被裁掉一半宽度,看起来就像「比例失调」。
-
-而 bgm 的 `type=2` 是全库搜索,除番剧本体外还混着「特别纪念动画」「联动 PV」这类条目,
-它们的封面是**横版主视觉**。实测约 4–5% 的搜索结果是这种图(宽/高 1.41、1.59),
-而正规竖版海报集中在 **0.707**(√2/2),区间 0.659–0.756 —— 两者之间空档很宽,
-所以默认闸门取 `0.5–0.8` —— 上限压到 0.8 是为了同时挡住另一类更隐蔽的坏图:**蓝光碟盒封扫描**接近正方形(实测 0.854),不是横版却和满屏 0.707 的海报明显违和。
-
-需要放宽或收紧:
-
-```php
-// 例:允许接近正方形的封面
-add_filter('bangumi_list_cover_ratio_range', fn() => [0.5, 1.05]);
-// 封面最小宽度(默认 200px,用于挡掉 bgm 的 150px 缩略图兜底)
-add_filter('bangumi_list_cover_min_width', fn() => 300);
-```
-
-本机脚本对应 `--ratio-min` / `--ratio-max` / `--min-width`。
-
-## 自定义
-
-- **字体**:默认等宽字体栈(首选 Maple Mono NF CN)。想统一观感,可在主题里自托管该字体。
-- **抓取 User-Agent**:默认取站点地址,可用过滤器 `bangumi_list_user_agent` 覆盖。
-- **封面比例 / 尺寸门槛**:过滤器 `bangumi_list_cover_ratio_range`、`bangumi_list_cover_min_width`,见上方「关于比例闸」。
-- **配色 / 文案**:见上方短代码属性。
-- **评级档位**:过滤器 `bangumi_list_rating_tiers`,见下方「评级档位」。
+- 不做繁简转换，繁体番名要先改成简体；番名里的错别字也要自己改
+- 同一部番的不同季容易互相匹配错，抓完对照 `manifest.json` 里的 `matched_name` 检查一遍
+- 抓不到的条目不会动原有封面；被替换掉的旧图还留在媒体库里，需要时自己清理
+- 请求间隔默认 0.8 秒，最低 0.3 秒。两个图源都是公益站点，**请勿调低**
 
 ## 批量补 Bangumi 链接
 
-`tools/fetch-links-local.py` 与抓封面的工具同源,用来给 `_bgm_url` 批量补条目链接
-(填了链接的卡片前台才可点击跳转)。同样只依赖 Python 3 标准库。
+`tools/fetch-links-local.py` 用来给番剧批量补 `_bgm_url`，用法和抓封面相同：
 
 ```bash
-# ① 服务器上导出缺链接的番名列表(ID + post_title)
-# ② 本机搜索
 python3 tools/fetch-links-local.py needlink.json -o links.json
-# ③ 回传后用 wp eval 写入 _bgm_url
 ```
 
-> ⚠️ **链接错配肉眼不可见**,不像封面能一眼认出,入库前务必核对脚本结尾的两份报告:
->
-> - **重复 subject_id** —— 两部番指向同一条目,通常是季数串台(`title_score()` 分不清季数,
->   这类错配的相似度往往仍有 0.8 以上,靠分数阈值拦不住)
-> - **低分** —— 译名不同导致的错配,重复 id 检查覆盖不到;但低分里也混着正确结果
->   (如「金色时光」在 bgm 叫「青春纪行」),不能一刀切丢弃
->
-> 两份报告只覆盖本批次,**库中已有的链接需自行并入一起比对**,否则跨批次撞车查不出来。
+链接配错了，页面上是看不出来的。入库前要核对脚本结尾的两份报告：**重复 subject_id**，多半是季数串了；**低分**结果，可能只是译名不同，也可能真的配错了。这两份报告只覆盖本批次，库里已有的链接要合在一起比对。
 
-## 数据模型
+## 自定义
 
-CPT `anime` + post meta:`_bgm_rating_text`(评分文本,填数字即可)、`_bgm_rating_value`(解析出的数字,排序与折算档位用)、`_bgm_review`(评语)、`_bgm_watch_mode`(观看方式)、`_bgm_url`(bgm 链接,填了卡片即可点击跳转)。
+| 想改什么 | 怎么改 |
+|---|---|
+| 标题、用户名、强调色 | 短代码属性 |
+| 评级档位 | 过滤器 `bangumi_list_rating_tiers`，见下文 |
+| 封面比例、最小宽度 | 过滤器 `bangumi_list_cover_ratio_range`、`bangumi_list_cover_min_width`；本机脚本对应 `--ratio-min`、`--ratio-max`、`--min-width` |
+| 抓取用的 User-Agent | 过滤器 `bangumi_list_user_agent` |
+| 字体 | 默认等宽字体栈，首选 Maple Mono NF CN，可以在主题里自托管 |
+| 界面文字 | 写死在代码里的简体中文，改 `includes/render.php` 和 `assets/anime.js` |
+
+```php
+// 允许接近正方形的封面，最小宽度改成 300px
+add_filter('bangumi_list_cover_ratio_range', fn() => [0.5, 1.05]);
+add_filter('bangumi_list_cover_min_width', fn() => 300);
+```
 
 ### 评级档位
 
-角标文案由 `_bgm_rating_value` 折算,区间上闭下开;无评分显示 `—`。档位表见 `bgm_rating_tiers()`,
-后台编辑页会实时预览当前评分落在哪一档。
+默认档位如下。区间含上限、不含下限，没有评分时显示 `—`：
 
 | 档位 | 区间 | 颜色 |
-| --- | --- | --- |
-| 神作 | ≥ 9.5 | 绿 `#7ee787` |
-| 还不错 | 8.5 – 9.5 | 蓝 `#79c0ff` |
-| NPC | 7.5 – 8.5 | 灰 `#8b949e` |
-| 拉完了 | 6.7 – 7.5 | 橙 `#ffa657` |
-| 神了 | < 6.7 | 红 `#ff7b72` |
+|---|---|---|
+| 神作 | ≥ 9.5 | 绿 |
+| 还不错 | 8.5 – 9.5 | 蓝 |
+| NPC | 7.5 – 8.5 | 灰 |
+| 拉完了 | 6.7 – 7.5 | 橙 |
+| 神了 | < 6.7 | 红 |
 
-档位文案和阈值只有 `bgm_rating_tiers()` 一处,前台与后台预览同步生效;
-配色在 `assets/anime.css` 的 `.bgm-badge.bgm-t-*`。
-
-不想改插件代码时,在主题的 `functions.php` 里用过滤器整表替换:
+在主题的 `functions.php` 里可以整表替换：
 
 ```php
 add_filter('bangumi_list_rating_tiers', fn() => [
@@ -252,37 +166,24 @@ add_filter('bangumi_list_rating_tiers', fn() => [
 ]);
 ```
 
-约定:
+- `min` 从高到低排，最后一档写 `null` 兜底
+- `key` 对应配色，即 `assets/anime.css` 里的 `.bgm-badge.bgm-t-*`。换成新的 `key` 要自己补样式
 
-- 按 `min` 从高到低排,区间上闭下开。
-- 最后一档的 `min` 写 `null`,作为兜底。
-- `key` 沿用 `god` / `good` / `npc` / `meh` / `bad`,对应现有配色;换成新的 `key` 要自己在主题里补 `.bgm-badge.bgm-t-<key>` 的样式。
+## 数据模型
 
-老库里手写了 `/10` 的,想清成纯数字可跑一次(可选,不跑也不影响显示):
+内容类型 `anime`，各字段存在 post meta 里：
 
-```bash
-wp bangumi normalize-ratings --dry-run   # 先看会改什么
-wp bangumi normalize-ratings
-```
+- `_bgm_rating_text`：评分原文
+- `_bgm_rating_value`：解析出的数字，用于排序和分档
+- `_bgm_review`：评语
+- `_bgm_watch_mode`：观看方式
+- `_bgm_url`：Bangumi 链接
 
-## 注意
+## 其他
 
-- 站点若用了页面缓存(如 WP Fastest Cache),前端改动后记得清缓存。
-- 「观看方式」在卡片上只显示「速看 / 常规」两态(「速看」用暖色标出),完整原文显示在评语层里。
-- **未做 i18n**:前台文案是硬编码简体中文(`zsh`、`已收录 N 部`、`· 待配封面 ·` 等)。
-  要改成其它语言,直接编辑 `includes/render.php` 和 `assets/anime.js` 里的字符串即可。
-  评级档位文案见 `bgm_rating_tiers()`(或用过滤器 `bangumi_list_rating_tiers`);排序按钮文案在 `includes/render.php` 的
-  `data-label-*` 属性上(`assets/anime.js` 读取该属性,不再各存一份)。
-
-## 致谢
-
-番剧数据与封面来自 [Bangumi 番组计划](https://bgm.tv) 与 [蜜柑计划](https://mikanani.me)。
-bgm 走官方 API,mikan 无公开接口故解析其搜索页。两边都是公益站点,抓取脚本默认 0.8s
-间隔限流(低于 0.3s 会被强制抬回),**请勿调低**。
-
-封面图著作权归各自版权方所有。本工具只是代为下载到你自己的媒体库(不盗链、不转售),
-适用于个人博客展示看番记录;请勿用于商业用途。
+- 用了页面缓存插件的，改动后记得清缓存
+- 番剧数据和封面来自 [Bangumi 番组计划](https://bgm.tv) 和 [蜜柑计划](https://mikanani.me)。封面版权归各自的版权方，本插件只把图片下载到你自己的媒体库，仅供个人博客展示，请勿商用
 
 ## 许可证
 
-GPL-2.0-or-later,详见 [LICENSE](LICENSE)。
+GPL-2.0-or-later，详见 [LICENSE](LICENSE)。

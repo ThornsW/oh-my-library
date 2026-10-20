@@ -1,6 +1,6 @@
 // AI 宠物的最小示例角色：一个方块脸。
 // 用法：上传到 wp-content/uploads/ai-pet/character.js，刷新页面就能看到。
-// 接口说明见 README「方式二：JS 角色文件」；在这个文件的基础上改，就能做出自己的角色。
+// 接口说明见 README「JS 角色文件」；在这个文件的基础上改，就能做出自己的角色。
 (function () {
   const LINE = '#3a2f2a', FACE = '#f4c38a', CHEEK = '#f08a8a', WHITE = '#ffffff';
 

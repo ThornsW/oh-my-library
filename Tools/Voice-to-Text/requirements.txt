@@ -6,6 +6,6 @@
 # 只有在用其他 Python 环境运行时才需要 pip install -r requirements.txt，
 # 那样还需要先装 GTK 3 和 gobject-introspection 的开发包。
 #
-# 非 Python 依赖（系统命令）见 README「适用环境与限制」：
+# 非 Python 依赖（系统命令）见 README「运行环境」：
 #   xdotool xclip pipewire-bin x11-utils，构建单文件程序另需 gcc
 PyGObject>=3.42
