@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memo"
+version = "0.1.0"
+description = "Cross-platform desktop memo / sticky-note app for tracking todos with Markdown notes"
+# Chinese input reaches fcitx5 over the IBus protocol instead of the distro's
+# fcitx5 Qt plugin, so the bundled Qt no longer has to match the user's desktop
+# Qt and nothing here needs pinning to one Qt minor. See
+# memo/core/input_method.py for why the plugin route cannot work.
+requires-python = ">=3.11"
+dependencies = [
+    "PySide6>=6.4",
+    "platformdirs>=4.0",
+    "pynput>=1.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+memo = "memo.app:main"
+
+[tool.setuptools.packages.find]
+include = ["memo*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
