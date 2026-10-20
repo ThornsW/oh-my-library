@@ -78,9 +78,7 @@ provided the required subscription and can perform the manual proxy transition.
 ## Historical records
 
 - `docs/2026-06-02-ip-check2ippure-design.md` records the accepted initial design.
-- `docs/2026-06-02-ip-check2ippure.md` is the completed construction plan and contains
-  copied implementation snippets, obsolete paths, and old execution instructions.
 
-These files remain locally ignored because they include machine-specific and private
+This file remains locally ignored because it includes machine-specific and private
 operational details. Prefer the current code, tests, README, and this guide when they
 disagree.
