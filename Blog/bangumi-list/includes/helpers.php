@@ -51,17 +51,21 @@ function bgm_rating_display($text) {
  *
  * ⚠️「神了」是反讽的贬义,和最高档「神作」只差一字、方向相反,
  *   故两档配色必须对立(绿 vs 红),不能靠文案区分。
+ *
+ * 站点可用过滤器 bangumi_list_rating_tiers 整表替换,约定见 README「评级档位」。
  */
 function bgm_rating_tiers() {
     // 阈值降序,min 为 null 是兜底档。后台的档位预览经 json_encode 读同一张表,
     // 阈值只此一份,勿在 JS 或 CSS 中重复。
-    return [
+    $tiers = [
         ['min' => 9.5,  'key' => 'god',  'label' => '神作'],
         ['min' => 8.5,  'key' => 'good', 'label' => '还不错'],
         ['min' => 7.5,  'key' => 'npc',  'label' => 'NPC'],
         ['min' => 6.7,  'key' => 'meh',  'label' => '拉完了'],
         ['min' => null, 'key' => 'bad',  'label' => '神了'],
     ];
+    // BGM_TEST 下没有 WordPress,直接用默认表,纯函数单测不受影响。
+    return function_exists('apply_filters') ? apply_filters('bangumi_list_rating_tiers', $tiers) : $tiers;
 }
 
 function bgm_rating_tier($score) {

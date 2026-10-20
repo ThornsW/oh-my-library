@@ -3,7 +3,7 @@
  * Plugin Name:       Bangumi List 看番清单
  * Plugin URI:        https://github.com/ThornsW/bangumi-list
  * Description:       一个独立风格的「看番清单」页面:注册「动漫」内容类型,后台像写文章一样记录看过的番(封面/评分/评语),前台用终端风海报网格展示。短代码 [anime_list]。
- * Version:           0.5.2
+ * Version:           0.5.3
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            ThornsW
@@ -15,7 +15,7 @@
  */
 if (!defined('ABSPATH')) exit;
 
-define('BGM_VERSION', '0.5.2');
+define('BGM_VERSION', '0.5.3');
 define('BGM_DIR', plugin_dir_path(__FILE__));
 define('BGM_URL', plugin_dir_url(__FILE__));
 

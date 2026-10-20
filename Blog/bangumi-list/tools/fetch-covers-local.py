@@ -37,8 +37,8 @@ VPS 侧用 `wp bangumi import-covers` 从本地目录入库,全程不走网络�
     python3 tools/fetch-covers-local.py anime-list.json -o covers/
 
     # 3. 回传并入库
-    scp -r covers/ vps:/tmp/covers
-    ssh vps 'wp bangumi import-covers /tmp/covers'
+    scp -r covers/ <your-server>:/tmp/covers
+    ssh <your-server> 'wp bangumi import-covers /tmp/covers'
 """
 
 import argparse
@@ -594,7 +594,7 @@ def main():
             by_source[r["source"]] = by_source.get(r["source"], 0) + 1
     if by_source:
         print("图源分布: %s" % ", ".join("%s=%d" % kv for kv in sorted(by_source.items())))
-    print("\n下一步:\n    scp -r %s vps:/tmp/covers\n    ssh vps 'wp bangumi import-covers /tmp/covers'"
+    print("\n下一步:\n    scp -r %s <your-server>:/tmp/covers\n    ssh <your-server> 'wp bangumi import-covers /tmp/covers'"
           % args.out)
 
     # 标题对不上但收下的,单独列出来让人过一眼

@@ -1,0 +1,6 @@
+# Bangumi List 的 Python 依赖
+#
+# 插件本身是 PHP，没有 PHP / JS 第三方依赖。
+# tools/ 下的本机抓取脚本只用 Python 3 标准库。
+# 只有 examples/xlsx_to_json.py（把 Excel 清单转成导入用 JSON）需要：
+openpyxl

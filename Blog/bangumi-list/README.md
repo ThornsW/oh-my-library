@@ -2,6 +2,8 @@
 
 一个给 WordPress 加「看番清单」页面的独立插件:后台像写文章一样记录看过的番(封面 / 评分 / 评语),前台用**终端风海报网格**展示,风格与博客文章完全隔离。
 
+版本:0.5.3
+
 > A WordPress plugin that adds a terminal-styled anime watch-list page. Manage entries in wp-admin, render anywhere with the `[anime_list]` shortcode.
 
 ![看番清单前台效果](docs/screenshot.png)
@@ -27,26 +29,29 @@
 
 ## 安装
 
-### 推荐:下载 Release
-
-去 **[Releases](https://github.com/ThornsW/bangumi-list/releases/latest)** 下载 `bangumi-list-x.y.z.zip`,后台「插件 → 安装插件 → 上传插件」选它,**无需改名**。
-
-> ⚠️ 别用 Release 页面上的「Source code (zip)」,也别用仓库主页绿色按钮的「Download ZIP」—— 那两个解压出来分别是 `bangumi-list-x.y.z/` 和 `bangumi-list-main/`,目录名不对。
-
-### 从源码安装
-
 插件目录必须叫 `bangumi-list`,否则和文档、日后的更新机制对不上。
 
-```bash
-# 方式 A:git clone(目录名天然正确)
-cd wp-content/plugins/
-git clone https://github.com/ThornsW/bangumi-list.git
+### 从本仓库拷贝运行文件
 
-# 方式 B:下载源码 zip 后改名
-cd wp-content/plugins/
-unzip ~/bangumi-list-main.zip
-mv bangumi-list-main bangumi-list
+本插件位于 oh-my-library 仓库的 `Blog/bangumi-list/`。只把运行时文件拷进 WordPress:`docs/`、`tools/`、`examples/` 是开发用的,不要上传(Nginx 等会把 `.md` 原样公开)。
+
+```bash
+cd Blog/bangumi-list
+mkdir -p /path/to/wp-content/plugins/bangumi-list
+cp -r bangumi-list.php includes assets cli LICENSE /path/to/wp-content/plugins/bangumi-list/
 ```
+
+想在后台「插件 → 安装插件 → 上传插件」里装,就先打成 zip(zip 里的顶层目录必须是 `bangumi-list/`):
+
+```bash
+cd Blog
+zip -qr ~/bangumi-list.zip bangumi-list/bangumi-list.php bangumi-list/includes \
+  bangumi-list/assets bangumi-list/cli bangumi-list/LICENSE
+```
+
+### 旧版本
+
+0.5.2 及以前的安装包在原仓库的 [Releases](https://github.com/ThornsW/bangumi-list/releases) 里,下载 `bangumi-list-x.y.z.zip` 后台上传即可,无需改名。别用 Release 页面上的「Source code (zip)」,解压出来的目录名不对。
 
 ### 装好之后
 
@@ -108,8 +113,8 @@ wp post list --post_type=anime --post_status=publish \
 python3 tools/fetch-covers-local.py anime-list.json -o covers/
 
 # ③ 回传并入库(源文件只读不删,可反复跑)
-scp -r covers/ vps:/tmp/covers
-ssh vps 'wp bangumi import-covers /tmp/covers'
+scp -r covers/ <your-server>:/tmp/covers
+ssh <your-server> 'wp bangumi import-covers /tmp/covers'
 ```
 
 `import-covers` 支持 `--dry-run` 先看会做什么、`--overwrite` 覆盖已有封面。
@@ -185,6 +190,7 @@ add_filter('bangumi_list_cover_min_width', fn() => 300);
 - **抓取 User-Agent**:默认取站点地址,可用过滤器 `bangumi_list_user_agent` 覆盖。
 - **封面比例 / 尺寸门槛**:过滤器 `bangumi_list_cover_ratio_range`、`bangumi_list_cover_min_width`,见上方「关于比例闸」。
 - **配色 / 文案**:见上方短代码属性。
+- **评级档位**:过滤器 `bangumi_list_rating_tiers`,见下方「评级档位」。
 
 ## 批量补 Bangumi 链接
 
@@ -224,8 +230,26 @@ CPT `anime` + post meta:`_bgm_rating_text`(评分文本,填数字即可)、`_bgm
 | 拉完了 | 6.7 – 7.5 | 橙 `#ffa657` |
 | 神了 | < 6.7 | 红 `#ff7b72` |
 
-改档位文案或阈值只需改 `bgm_rating_tiers()` 一处,前台与后台预览同步生效;
+档位文案和阈值只有 `bgm_rating_tiers()` 一处,前台与后台预览同步生效;
 配色在 `assets/anime.css` 的 `.bgm-badge.bgm-t-*`。
+
+不想改插件代码时,在主题的 `functions.php` 里用过滤器整表替换:
+
+```php
+add_filter('bangumi_list_rating_tiers', fn() => [
+    ['min' => 9.0,  'key' => 'god',  'label' => '神作'],
+    ['min' => 8.0,  'key' => 'good', 'label' => '推荐'],
+    ['min' => 7.0,  'key' => 'npc',  'label' => '一般'],
+    ['min' => 6.0,  'key' => 'meh',  'label' => '较差'],
+    ['min' => null, 'key' => 'bad',  'label' => '不推荐'],
+]);
+```
+
+约定:
+
+- 按 `min` 从高到低排,区间上闭下开。
+- 最后一档的 `min` 写 `null`,作为兜底。
+- `key` 沿用 `god` / `good` / `npc` / `meh` / `bad`,对应现有配色;换成新的 `key` 要自己在主题里补 `.bgm-badge.bgm-t-<key>` 的样式。
 
 老库里手写了 `/10` 的,想清成纯数字可跑一次(可选,不跑也不影响显示):
 
@@ -240,7 +264,7 @@ wp bangumi normalize-ratings
 - 「观看方式」在卡片上只显示「速看 / 常规」两态(「速看」用暖色标出),完整原文显示在评语层里。
 - **未做 i18n**:前台文案是硬编码简体中文(`zsh`、`已收录 N 部`、`· 待配封面 ·` 等)。
   要改成其它语言,直接编辑 `includes/render.php` 和 `assets/anime.js` 里的字符串即可。
-  评级档位文案见 `bgm_rating_tiers()`;排序按钮文案在 `includes/render.php` 的
+  评级档位文案见 `bgm_rating_tiers()`(或用过滤器 `bangumi_list_rating_tiers`);排序按钮文案在 `includes/render.php` 的
   `data-label-*` 属性上(`assets/anime.js` 读取该属性,不再各存一份)。
 
 ## 致谢
