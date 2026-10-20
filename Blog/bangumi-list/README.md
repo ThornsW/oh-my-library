@@ -51,7 +51,14 @@ zip -qr ~/bangumi-list.zip bangumi-list/bangumi-list.php bangumi-list/includes \
 
 ### 旧版本
 
-0.5.2 及以前的安装包在原仓库的 [Releases](https://github.com/ThornsW/bangumi-list/releases) 里,下载 `bangumi-list-x.y.z.zip` 后台上传即可,无需改名。别用 Release 页面上的「Source code (zip)」,解压出来的目录名不对。
+每个版本都在本仓库的提交历史里,提交说明带版本号。在仓库根目录用 `git log --oneline -- Blog/bangumi-list` 找到对应提交,再打包(把 `<提交号>` 和文件名里的版本号换掉):
+
+```bash
+git archive --format=zip --prefix=bangumi-list/ -o ~/bangumi-list-0.4.0.zip \
+  <提交号>:Blog/bangumi-list bangumi-list.php includes assets cli LICENSE
+```
+
+得到的 zip 在后台上传即可。
 
 ### 装好之后
 
