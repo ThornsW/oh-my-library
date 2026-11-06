@@ -18,11 +18,13 @@ from typing import Callable
 from gi.repository import GLib
 
 from . import deliver as dv
+from . import polish as pl
 from .asr import transcribe
 from .audio import Recorder
 from .config import Config
 from .errors import ForegroundChanged, Stage, StageError
 from .log import log, redact
+from .plugins import PluginSet
 from .postprocess import clean
 
 
@@ -51,6 +53,7 @@ def on_main(fn: Callable, *args) -> None:
 class State:
     RECORDING = "录音中"
     RECOGNIZING = "识别中"
+    POLISHING = "润色中"
     QUEUED = "排队发送"
     DELIVERING = "发送中"
     PASTED = "已粘贴"
@@ -61,7 +64,8 @@ class State:
     COPIED = "已复制"
 
 
-UNSENT = {State.QUEUED, State.DELIVERING, State.PENDING}
+UNSENT = {State.POLISHING, State.QUEUED, State.DELIVERING, State.PENDING}
+BUSY = {State.RECORDING, State.RECOGNIZING, State.POLISHING}  # text not final yet
 
 
 @dataclass
@@ -75,6 +79,7 @@ class Utterance:
     seconds: float = 0.0
     wav: bytes | None = None  # kept until recognized, for "重新识别"
     target: int | None = None
+    remark: str = ""  # survives state changes, e.g. "润色失败，已用原话"
 
 
 class Pipeline:
@@ -101,6 +106,8 @@ class Pipeline:
         self.toggle_mode = False  # recording started by a short tap; next tap stops it
         self.last_external: int | None = None  # follow mode: last active window not ours
         self._max_timer = 0  # GLib source id of the max-duration timer
+        self.plugins = PluginSet(cfg.plugins_dir)
+        self.plugins.ensure_builtin()
 
     # ---------- helpers ----------
 
@@ -261,14 +268,67 @@ class Pipeline:
             return
         u.text = clean(text or "", self.cfg["replacements"], self.cfg["strip_trailing_period"])
         u.wav = None
+        if u.text and self.cfg["polish_enabled"]:
+            self._polish(u)
+        else:
+            self._text_ready(u)
+
+    # ---------- polishing ----------
+
+    def _polish(self, u: Utterance) -> None:
+        self._set(u, State.POLISHING)
+        self.notice.emit("busy", "润色中…")
+        try:
+            try:
+                provider = dict(self.cfg.provider())
+            except LookupError:
+                provider = None
+            service = pl.resolve_service(pl.settings_of(self.cfg), provider)
+        except StageError as e:
+            self._on_polish_done(u.id, None, e)
+            return
+        args = (service, u.text, self.cfg["context"], float(self.cfg["polish_timeout_s"]))
+
+        def job():
+            try:
+                on_main(self._on_polish_done, u.id, pl.polish(*args), None)
+            except StageError as e:
+                on_main(self._on_polish_done, u.id, None, e)
+            except Exception as e:
+                log.exception("polish: unexpected")
+                on_main(self._on_polish_done, u.id, None,
+                        StageError(Stage.POLISH, "润色时出现意外错误", redact(repr(e))))
+
+        self._asr_pool.submit(job)
+
+    def _on_polish_done(self, uid: int, text: str | None, err: StageError | None) -> None:
+        """On any failure the recognized text is used as is, so nothing is lost."""
+        u = self.items.get(uid)
+        if not u:
+            return
+        if err:
+            log.warning("polish: #%d %s %s", uid, err, err.detail)
+            u.remark = f"润色失败，已用原话：{err.reason}"
+        else:
+            u.text = clean(text, self.cfg["replacements"], self.cfg["strip_trailing_period"]) or u.text
+        self._text_ready(u)
+
+    def _text_ready(self, u: Utterance) -> None:
+        try:
+            u.text = self.plugins.apply(u.text, self.cfg["plugins_enabled"])
+        except Exception:  # a plugin must never cost the user their sentence
+            log.exception("plugins: apply failed, text kept as is")
         if not u.text:
             self._set(u, State.FAILED, StageError(Stage.ASR, "整理后文字为空"))
-        elif uid in self._auto_queue:
+        elif u.id in self._auto_queue:
             self._set(u, State.QUEUED)
         else:
             self._set(u, State.EDITOR)
             self.editor_append.emit(u.text)
-            self.notice.emit("ok", "识别完成，已放入编辑框")
+            if u.remark:
+                self.notice.emit("warn", f"{u.remark}（已放入编辑框）")
+            else:
+                self.notice.emit("ok", "识别完成，已放入编辑框")
         self._pump()
 
     # ---------- delivery ----------
@@ -282,7 +342,7 @@ class Pipeline:
             if head is None:
                 self._auto_queue.pop(0)
                 continue
-            if head.state in (State.RECORDING, State.RECOGNIZING):
+            if head.state in BUSY:
                 return  # wait so a later sentence never overtakes an earlier one
             self._auto_queue.pop(0)
             if head.state == State.QUEUED:
@@ -322,8 +382,8 @@ class Pipeline:
             else:
                 self._set(u, State.SUBMITTED if result.entered else State.PASTED, note=result.note)
                 short = u.text if len(u.text) <= 24 else u.text[:24] + "…"
-                if result.note:
-                    self.notice.emit("warn", f"{result.note}：{short}")
+                if result.note or u.remark:
+                    self.notice.emit("warn", f"{result.note or u.remark}：{short}")
                 else:
                     self.notice.emit("ok", ("已提交：" if result.entered else "已粘贴：") + short)
         self._pump()
@@ -331,7 +391,7 @@ class Pipeline:
     def send(self, uid: int) -> None:
         """User explicitly asked to send this item (again)."""
         u = self.items.get(uid)
-        if not u or not u.text or u.state in (State.DELIVERING, State.RECOGNIZING, State.RECORDING):
+        if not u or not u.text or u.state in BUSY or u.state == State.DELIVERING:
             return
         self._set(u, State.QUEUED)
         self._auto_queue.append(uid)
@@ -370,7 +430,7 @@ class Pipeline:
 
     def remove(self, uid: int) -> None:
         u = self.items.get(uid)
-        if u and u.state not in (State.RECORDING, State.RECOGNIZING, State.DELIVERING):
+        if u and u.state not in BUSY and u.state != State.DELIVERING:
             del self.items[uid]
             self._save_pending()
 

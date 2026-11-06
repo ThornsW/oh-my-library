@@ -7,6 +7,7 @@ class Stage:
     CONFIG = "配置"
     RECORD = "录音"
     ASR = "识别"
+    POLISH = "润色"
     TARGET = "找窗口"
     FOCUS = "切焦点"
     CLIPBOARD = "剪贴板"

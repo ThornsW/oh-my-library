@@ -64,6 +64,17 @@ DEFAULTS: dict = {
     "replacements": "",  # one rule per line: wrong => right
     "strip_trailing_period": False,
     "request_timeout_s": 30,
+    # Polishing: a text model tidies the recognized sentence before it is sent
+    "polish_enabled": False,
+    "polish_reuse_provider": True,  # use the recognition service's address and key
+    "polish_base_url": "https://maas.qianwenaiapi.com/compatible-mode/v1",
+    "polish_api_key": "",
+    "polish_model": "qwen3.8-flash",
+    "polish_prompt": "",  # "" = the built-in prompt (polish.DEFAULT_PROMPT)
+    "polish_extra_json": '{"enable_thinking": false}',  # Qwen 3.x: answer directly, no slow thinking
+    "polish_timeout_s": 10,
+    # Plugins: names of the plugins/*.rules files that are switched on
+    "plugins_enabled": [],
     # Recording
     "audio_device": "",  # PipeWire node.name; "" = system default
     "min_seconds": 0.4,
@@ -117,6 +128,10 @@ class Config:
     def cache_dir(self) -> Path:
         return self.dir / "cache"
 
+    @property
+    def plugins_dir(self) -> Path:
+        return self.dir / "plugins"
+
     def load(self) -> "Config":
         if self.path.exists():
             with open(self.path, encoding="utf-8") as f:
@@ -125,9 +140,13 @@ class Config:
                 self.data[k] = v
         else:
             self.save()
+        self._register_secrets()
+        return self
+
+    def _register_secrets(self) -> None:
         for p in self.data.get("providers", []):
             register_secret(p.get("api_key"))
-        return self
+        register_secret(self.data.get("polish_api_key"))
 
     def save(self) -> None:
         self.dir.mkdir(parents=True, exist_ok=True)
@@ -136,8 +155,7 @@ class Config:
             json.dump(self.data, f, ensure_ascii=False, indent=2)
         os.chmod(tmp, 0o600)  # holds API keys
         os.replace(tmp, self.path)
-        for p in self.data.get("providers", []):
-            register_secret(p.get("api_key"))
+        self._register_secrets()
 
     def __getitem__(self, key: str):
         return self.data.get(key, DEFAULTS.get(key))

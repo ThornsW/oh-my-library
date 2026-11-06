@@ -167,6 +167,29 @@ def _server_message(body: str) -> str:
     return ""
 
 
+def post(req: AsrRequest, timeout: float, stage: str = Stage.ASR, service: str = "识别服务",
+         tag: str = "asr") -> str:
+    """POST and return the response body. HTTP and network failures become StageError(stage)."""
+    http_req = urllib.request.Request(req.url, data=req.body, headers=req.headers, method="POST")
+    try:
+        with urllib.request.urlopen(http_req, timeout=timeout) as resp:
+            return resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", "replace")
+        msg = _server_message(body)
+        reason = _STATUS_REASONS.get(e.code, "服务端错误" if e.code >= 500 else "请求失败")
+        detail = redact(f"HTTP {e.code} {req.url}\n{body[:800]}")
+        log.warning("%s: %s", tag, detail)
+        raise StageError(stage, f"HTTP {e.code} {reason}" + (f"：{redact(msg)}" if msg else ""), detail)
+    except (socket.timeout, TimeoutError):
+        raise StageError(stage, f"请求超时（{timeout:.0f} 秒没有响应）", req.url)
+    except urllib.error.URLError as e:
+        reason = e.reason
+        if isinstance(reason, (socket.timeout, TimeoutError)):
+            raise StageError(stage, f"请求超时（{timeout:.0f} 秒没有响应）", req.url)
+        raise StageError(stage, f"无法连接{service}（检查网络和接口地址）", redact(f"{req.url}\n{reason}"))
+
+
 def transcribe(provider: dict, wav: bytes, language: str = "", context: str = "",
                timeout: float = 30, allow_empty: bool = False) -> str:
     protocol = provider.get("protocol")
@@ -180,24 +203,7 @@ def transcribe(provider: dict, wav: bytes, language: str = "", context: str = ""
     t0 = time.monotonic()
     log.info("asr: POST %s model=%s protocol=%s audio=%d bytes", req.url, provider["model"],
              protocol, len(wav))
-    http_req = urllib.request.Request(req.url, data=req.body, headers=req.headers, method="POST")
-    try:
-        with urllib.request.urlopen(http_req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", "replace")
-        msg = _server_message(body)
-        reason = _STATUS_REASONS.get(e.code, "服务端错误" if e.code >= 500 else "请求失败")
-        detail = redact(f"HTTP {e.code} {req.url}\n{body[:800]}")
-        log.warning("asr: %s", detail)
-        raise StageError(Stage.ASR, f"HTTP {e.code} {reason}" + (f"：{redact(msg)}" if msg else ""), detail)
-    except (socket.timeout, TimeoutError):
-        raise StageError(Stage.ASR, f"请求超时（{timeout:.0f} 秒没有响应）", req.url)
-    except urllib.error.URLError as e:
-        reason = e.reason
-        if isinstance(reason, (socket.timeout, TimeoutError)):
-            raise StageError(Stage.ASR, f"请求超时（{timeout:.0f} 秒没有响应）", req.url)
-        raise StageError(Stage.ASR, "无法连接识别服务（检查网络和接口地址）", redact(f"{req.url}\n{reason}"))
+    raw = post(req, timeout)
     elapsed = (time.monotonic() - t0) * 1000
     try:
         data = json.loads(raw)

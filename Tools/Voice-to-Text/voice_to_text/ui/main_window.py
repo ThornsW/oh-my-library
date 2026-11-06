@@ -266,7 +266,10 @@ class MainWindow(Gtk.Window):
 
     def _on_item(self, u: Utterance) -> None:
         body = u.text or (u.error.reason if u.error else "")
-        extra = f"  ⚠ {u.error.reason}" if (u.error and u.text) else ""
+        warnings = [u.error.reason] if (u.error and u.text) else []
+        if u.remark:
+            warnings.append(u.remark)
+        extra = "".join(f"  ⚠ {w}" for w in warnings)
         note = f"  （{u.note}）" if u.note else ""
         row = [u.id, f"#{u.id} [{u.state}] {body}{extra}{note}", ITEM_COLOR.get(u.state, "#202124")]
         it = self._rows.get(u.id)

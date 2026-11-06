@@ -42,7 +42,34 @@ def _diag_asr(cfg: Config, wav_path: str, provider_name: str | None) -> int:
     text = transcribe(provider, wav, cfg["language"], cfg["context"], cfg["request_timeout_s"])
     print(f"[{provider['name']}] {(time.monotonic() - t0) * 1000:.0f} ms")
     print("原始:", text)
-    print("整理:", clean(text, cfg["replacements"], cfg["strip_trailing_period"]))
+    text = clean(text, cfg["replacements"], cfg["strip_trailing_period"])
+    print("整理:", text)
+    _print_plugins(cfg, text)
+    return 0
+
+
+def _print_plugins(cfg: Config, text: str) -> None:
+    from .plugins import PluginSet
+    if cfg["plugins_enabled"]:
+        print(f"插件({', '.join(cfg['plugins_enabled'])}):", PluginSet(cfg.plugins_dir).apply(text, cfg["plugins_enabled"]))
+
+
+def _diag_polish(cfg: Config, text: str) -> int:
+    from . import polish as pl
+    from .postprocess import clean
+    try:
+        provider = cfg.provider()
+    except LookupError:
+        provider = None
+    service = pl.resolve_service(pl.settings_of(cfg), provider)
+    raw = clean(text, cfg["replacements"])
+    t0 = time.monotonic()
+    out = pl.polish(service, raw, cfg["context"], cfg["polish_timeout_s"])
+    print(f"[{service['model']}] {(time.monotonic() - t0) * 1000:.0f} ms")
+    print("原话:", raw)
+    out = clean(out, cfg["replacements"], cfg["strip_trailing_period"])
+    print("润色:", out)
+    _print_plugins(cfg, out)
     return 0
 
 
@@ -63,6 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", default="vtt-record.wav", help="--record 的输出文件")
     p.add_argument("--test-asr", metavar="WAV", help="用一个 WAV 文件测试识别")
     p.add_argument("--provider", help="--test-asr 使用的服务名称（默认当前选中的）")
+    p.add_argument("--test-polish", metavar="TEXT", help="用当前润色设置润色一句话（不管是否已启用）")
     p.add_argument("--test-deliver", metavar="TEXT", help="把文字投递到目标窗口")
     p.add_argument("--window", type=int, help="--test-deliver 的窗口 id（默认已绑定的）")
     p.add_argument("--enter", action="store_true", help="--test-deliver 后按回车")
@@ -81,6 +109,8 @@ def main(argv: list[str] | None = None) -> int:
             return _diag_record(cfg, args.record, args.out)
         if args.test_asr:
             return _diag_asr(cfg, args.test_asr, args.provider)
+        if args.test_polish:
+            return _diag_polish(cfg, args.test_polish)
         if args.test_deliver:
             return _diag_deliver(cfg, args.test_deliver, args.window, args.enter)
     except StageError as e:

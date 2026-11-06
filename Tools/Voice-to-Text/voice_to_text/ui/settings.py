@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import copy
 import threading
+import time
 
 from gi.repository import GLib, Gtk
 
 from .. import __version__
+from .. import polish as pl
 from ..asr import transcribe
 from ..audio import list_input_devices, wav_bytes
 from ..config import PROTOCOLS, Config
 from ..errors import StageError
 from ..log import redact
+from ..plugins import PluginSet
 from .style import text_of, text_view
 
 AUDIO_FORMATS = {
@@ -68,6 +71,13 @@ class Form(Gtk.Grid):
         self._row += 1
 
 
+def scrolled(widget: Gtk.Widget) -> Gtk.ScrolledWindow:
+    scroll = Gtk.ScrolledWindow()
+    scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+    scroll.add(widget)
+    return scroll
+
+
 def hint(text: str) -> Gtk.Label:
     lab = Gtk.Label(label=text, xalign=0)
     lab.set_line_wrap(True)
@@ -89,6 +99,8 @@ class SettingsDialog(Gtk.Dialog):
         tabs = Gtk.Notebook()
         tabs.append_page(self._provider_tab(), Gtk.Label(label="识别服务"))
         tabs.append_page(self._recognition_tab(), Gtk.Label(label="识别"))
+        tabs.append_page(self._polish_tab(), Gtk.Label(label="润色"))
+        tabs.append_page(self._plugins_tab(), Gtk.Label(label="插件"))
         tabs.append_page(self._recording_tab(), Gtk.Label(label="录音"))
         tabs.append_page(self._delivery_tab(), Gtk.Label(label="投递"))
         self.error = Gtk.Label(xalign=0)
@@ -181,6 +193,158 @@ class SettingsDialog(Gtk.Dialog):
         form.add("", self.strip_period)
         form.add("请求超时（秒）", self.timeout)
         return form
+
+    def _polish_tab(self) -> Gtk.Widget:
+        c = self.cfg
+        self.pl_enabled = Gtk.CheckButton(label="启用润色：识别后再用文字模型整理一遍（每句多等约 1 秒）")
+        self.pl_enabled.set_active(bool(c["polish_enabled"]))
+        self.pl_reuse = Gtk.CheckButton(label="沿用「识别服务」页当前服务的接口地址和 API Key")
+        self.pl_reuse.set_active(bool(c["polish_reuse_provider"]))
+        self.pl_url = Gtk.Entry(text=c["polish_base_url"] or "")
+        self.pl_model = Gtk.Entry(text=c["polish_model"] or "")
+        self.pl_key = Gtk.Entry(visibility=False, text=c["polish_api_key"] or "")
+        show_key = Gtk.CheckButton(label="显示")
+        show_key.connect("toggled", lambda b: self.pl_key.set_visibility(b.get_active()))
+        self.pl_key_row = Gtk.Box(spacing=6)
+        self.pl_key_row.pack_start(self.pl_key, True, True, 0)
+        self.pl_key_row.pack_start(show_key, False, False, 0)
+        self.pl_reuse.connect("toggled", lambda _b: self._sync_polish_reuse())
+        self._sync_polish_reuse()
+        prompt_scroll, self.pl_prompt = text_view(c["polish_prompt"] or pl.DEFAULT_PROMPT, 170)
+        reset = Gtk.Button(label="恢复默认提示词")
+        reset.connect("clicked", lambda _b: self.pl_prompt.get_buffer().set_text(pl.DEFAULT_PROMPT))
+        extra_scroll, self.pl_extra = text_view(c["polish_extra_json"] or "", 50)
+        self.pl_timeout = spin(3, 60, 1, int(c["polish_timeout_s"]))
+        test_btn = Gtk.Button(label="测试润色")
+        test_btn.connect("clicked", lambda _b: self._test_polish())
+        self.pl_result = Gtk.Label(xalign=0)
+        self.pl_result.set_line_wrap(True)
+        self.pl_result.set_max_width_chars(50)
+        self.pl_result.set_selectable(True)
+        form = Form()
+        form.full(self.pl_enabled)
+        form.full(self.pl_reuse)
+        form.add("接口地址", self.pl_url)
+        form.add("API Key", self.pl_key_row)
+        form.add("模型", self.pl_model)
+        form.add("提示词", prompt_scroll)
+        form.add("", reset)
+        form.add("附加参数（JSON）", extra_scroll)
+        form.add("超时（秒）", self.pl_timeout)
+        form.full(test_btn)
+        form.full(self.pl_result)
+        form.full(hint("需要 OpenAI 兼容的聊天接口（{地址}/chat/completions）。"
+                       "润色失败或超时会照常发送原话。「热词」会一起发给模型。"
+                       "默认附加参数用来关闭千问的思考模式；换用别家服务报 HTTP 400 时，把它清空。"))
+        return scrolled(form)
+
+    def _sync_polish_reuse(self) -> None:
+        own = not self.pl_reuse.get_active()
+        self.pl_url.set_sensitive(own)
+        self.pl_key_row.set_sensitive(own)
+
+    def _polish_settings(self) -> dict:
+        prompt = text_of(self.pl_prompt).strip()
+        return {
+            "polish_reuse_provider": self.pl_reuse.get_active(),
+            "polish_base_url": self.pl_url.get_text().strip(),
+            "polish_api_key": self.pl_key.get_text().strip(),
+            "polish_model": self.pl_model.get_text().strip(),
+            # store "" for the built-in prompt so later improvements to it apply
+            "polish_prompt": "" if prompt == pl.DEFAULT_PROMPT.strip() else prompt,
+            "polish_extra_json": text_of(self.pl_extra).strip(),
+        }
+
+    def _test_polish(self) -> None:
+        self._store_form()
+        provider = dict(self.providers[self._current]) if self.providers else None
+        sample = "嗯那个就是帮我帮我看一下这个这个 bug 是怎么回事"
+        context, timeout = text_of(self.context).strip(), self.pl_timeout.get_value_as_int()
+        try:
+            service = pl.resolve_service(self._polish_settings(), provider)
+        except StageError as e:
+            self.pl_result.set_text(f"✗ {e}")
+            return
+        self.pl_result.set_text("测试中…")
+
+        def job():
+            t0 = time.monotonic()
+            try:
+                out = pl.polish(service, sample, context, timeout)
+                msg = f"✓ {(time.monotonic() - t0) * 1000:.0f} ms\n原话：{sample}\n润色：{out}"
+            except StageError as e:
+                msg = redact(f"✗ {e}\n{e.detail}".strip())
+            GLib.idle_add(lambda: self.pl_result.set_text(msg) or False)
+
+        threading.Thread(target=job, daemon=True).start()
+
+    def _plugins_tab(self) -> Gtk.Widget:
+        self.plugin_set = PluginSet(self.cfg.plugins_dir)
+        self._enabled_plugins = set(self.cfg["plugins_enabled"] or [])
+        self.plugin_checks: dict[str, Gtk.CheckButton] = {}
+        self.plugin_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        open_btn = Gtk.Button(label="打开插件文件夹")
+        open_btn.connect("clicked", lambda _b: self._open_plugins_dir())
+        refresh = Gtk.Button(label="刷新列表")
+        refresh.connect("clicked", lambda _b: self._fill_plugins())
+        buttons = Gtk.Box(spacing=6)
+        buttons.pack_start(open_btn, False, False, 0)
+        buttons.pack_start(refresh, False, False, 0)
+        self.plugin_sample = Gtk.Entry(text="嗯，对。你看一下「设置」页面（第二个）里的选项？")
+        self.plugin_sample.connect("changed", lambda _e: self._test_plugins())
+        self.plugin_result = Gtk.Label(xalign=0)
+        self.plugin_result.set_line_wrap(True)
+        self.plugin_result.set_selectable(True)
+        form = Form()
+        form.full(hint("插件是程序目录 plugins/ 里的 .rules 文件，每行一条「正则 => 替换」。"
+                       "勾选的插件按文件名顺序，在润色之后对每句识别结果做最后一步处理。"
+                       "改了文件不用重启，下一句就生效；新加的文件点「刷新列表」。"))
+        form.full(self.plugin_box)
+        form.full(buttons)
+        form.add("测试句", self.plugin_sample)
+        form.add("结果", self.plugin_result)
+        self._fill_plugins()
+        return scrolled(form)
+
+    def _fill_plugins(self) -> None:
+        for name, check in self.plugin_checks.items():  # keep unsaved ticks across a refresh
+            (self._enabled_plugins.add if check.get_active() else self._enabled_plugins.discard)(name)
+        for child in self.plugin_box.get_children():
+            child.destroy()
+        self.plugin_checks = {}
+        plugins = self.plugin_set.all()
+        if not plugins:
+            self.plugin_box.pack_start(hint(f"{self.cfg.plugins_dir} 里还没有 .rules 文件"), False, False, 0)
+        for p in plugins:
+            check = Gtk.CheckButton(label=f"{p.name}（{len(p.rules)} 条规则）")
+            check.set_active(p.name in self._enabled_plugins)
+            check.connect("toggled", lambda _c: self._test_plugins())
+            self.plugin_box.pack_start(check, False, False, 0)
+            self.plugin_checks[p.name] = check
+            if p.errors:
+                more = f" 等 {len(p.errors)} 处" if len(p.errors) > 3 else ""
+                err = Gtk.Label(label="⚠ 跳过了写错的规则：" + "；".join(p.errors[:3]) + more, xalign=0)
+                err.set_line_wrap(True)
+                err.set_max_width_chars(50)
+                err.get_style_context().add_class("error-text")
+                self.plugin_box.pack_start(err, False, False, 0)
+        self.plugin_box.show_all()
+        self._test_plugins()
+
+    def _checked_plugins(self) -> list[str]:
+        return [name for name, check in self.plugin_checks.items() if check.get_active()]
+
+    def _test_plugins(self) -> None:
+        self.plugin_result.set_text(self.plugin_set.apply(self.plugin_sample.get_text(), self._checked_plugins()))
+
+    def _open_plugins_dir(self) -> None:
+        self.plugin_set.ensure_builtin()
+        d = self.cfg.plugins_dir
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+            Gtk.show_uri_on_window(self, d.as_uri(), Gtk.get_current_event_time())
+        except (OSError, GLib.Error) as e:
+            self.error.set_text(f"打不开插件文件夹 {d}：{getattr(e, 'message', e)}")
 
     def _recording_tab(self) -> Gtk.Widget:
         c = self.cfg
@@ -318,6 +482,11 @@ class SettingsDialog(Gtk.Dialog):
         c["replacements"] = text_of(self.replacements)
         c["strip_trailing_period"] = self.strip_period.get_active()
         c["request_timeout_s"] = self.timeout.get_value_as_int()
+        c["polish_enabled"] = self.pl_enabled.get_active()
+        for k, v in self._polish_settings().items():
+            c[k] = v
+        c["polish_timeout_s"] = self.pl_timeout.get_value_as_int()
+        c["plugins_enabled"] = self._checked_plugins()
         dev = self.device.get_active_id()
         c["audio_device"] = "" if dev in (None, DEFAULT_DEVICE) else dev
         c["max_seconds"] = self.max_s.get_value_as_int()

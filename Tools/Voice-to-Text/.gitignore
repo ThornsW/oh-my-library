@@ -4,6 +4,7 @@ config.json.tmp
 # Runtime output
 logs/
 cache/
+plugins/
 # Python
 __pycache__/
 *.pyc
