@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:       Bangumi List 看番清单
- * Plugin URI:        https://github.com/ThornsW/oh-my-library/tree/main/Blog/bangumi-list
+ * Plugin URI:        https://github.com/ThornsW/oh-my-library/tree/master/Blog/bangumi-list
  * Description:       一个独立风格的「看番清单」页面:注册「动漫」内容类型,后台像写文章一样记录看过的番(封面/评分/评语),前台用终端风海报网格展示。短代码 [anime_list]。
  * Version:           0.5.3
  * Requires at least: 5.8

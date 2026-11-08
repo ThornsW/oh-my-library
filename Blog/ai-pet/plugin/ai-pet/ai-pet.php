@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:       AI 宠物
- * Plugin URI:        https://github.com/ThornsW/oh-my-library/tree/main/Blog/ai-pet
+ * Plugin URI:        https://github.com/ThornsW/oh-my-library/tree/master/Blog/ai-pet
  * Description:       给博客左下角加一个会聊天的看板角色（自备图片或 JS 角色文件）。它会根据当前页面和全站文章推荐站内内容，聊天后端是任意 OpenAI 兼容接口。
  * Version:           0.4.1
  * Author:            Thorns

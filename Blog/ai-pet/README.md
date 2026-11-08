@@ -165,7 +165,7 @@ Q 版的<你的角色>，从画面底边探出头和两只前爪，正面看向�
 
 ## 看番清单联动
 
-同时装了 [Bangumi List 看番清单](https://github.com/ThornsW/oh-my-library/tree/main/Blog/bangumi-list) 时，角色也能推荐番剧，访客打开看番页时会说专门的台词。
+同时装了 [Bangumi List 看番清单](https://github.com/ThornsW/oh-my-library/tree/master/Blog/bangumi-list) 时，角色也能推荐番剧，访客打开看番页时会说专门的台词。
 
 ## 许可
 

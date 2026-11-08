@@ -57,7 +57,7 @@ from difflib import SequenceMatcher
 MIKAN_HOST = "https://mikanani.me"
 BGM_SEARCH = "https://api.bgm.tv/search/subject/{kw}?type=2&responseGroup=small&max_results={n}"
 
-UA = "bangumi-list-cover-fetcher/1.0 (+https://github.com/ThornsW/oh-my-library/tree/main/Blog/bangumi-list)"
+UA = "bangumi-list-cover-fetcher/1.0 (+https://github.com/ThornsW/oh-my-library/tree/master/Blog/bangumi-list)"
 # mikan 是常规站点不是 API,用浏览器 UA 更不容易被中间层拦;bgm 官方要求带可识别 UA。
 UA_BROWSER = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
