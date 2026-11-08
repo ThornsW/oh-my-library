@@ -1,21 +1,25 @@
 /*
- * 四种拖拽手势:
- *   侧栏 → 某一天       新增一条排期,待办本身留在侧栏
- *   某一天 → 另一天     只移动被拖的这一天,不是整体平移
- *   某一天 → 侧栏       删掉这一天的排期
- *   同一天内上下拖      调整当天顺序
+ * 各块共用:和服务器通信,以及「改完之后把页面同步成服务器上的样子」。
  *
- * 界面先动、请求后发。手上刚做完的动作立刻看到结果,失败了整页重载回到
- * 服务器的真实状态 —— 拖拽的手感经不起等一个来回。
+ * 写操作一律走 write():界面先按预期动起来,请求成功后再向服务器取一次
+ * 页面上会变的几块 —— 左栏、七天的卡片、右栏的排期一览 —— 整块换掉。
+ * 一次改动会牵动哪些地方(改标题要动卡片,结项要把左栏那条收走,拖进
+ * 某天要把它从「未来计划」挪进「待办」)不必逐个记着去补;早先就是漏补
+ * 了好几处,要刷新整页才看得到。
+ *
+ * 取回来的内容可能已经过时:取的路上又发了新的写,就作废这一份,等那次写
+ * 回来再取。正拖着卡片时也不换,等松手 —— 被拖的元素一换,这一拖就断了。
  */
-( function () {
+var weekplanUI = ( function () {
 	'use strict';
 
 	var config = window.weekplanData || {};
-	var dragged = null;   // { el, todoId, scheduleId, date }
-	var insertBefore = null;
+	var root = document.querySelector( '.weekplan' );
 
-	/* ---------- 与服务器通信 ---------- */
+	var writing = 0;    // 还在路上的写请求
+	var version = 0;    // 每发起一次写 +1
+	var timer = null;
+	var afterDrag = false;
 
 	function post( action, payload ) {
 		var body = new URLSearchParams();
@@ -47,13 +51,174 @@
 		} );
 	}
 
-	function fail( error ) {
-		window.console && console.error( '[week-plan]', error );
-		window.alert( '操作没成功:' + error.message + '\n页面将重新载入,回到服务器上的真实状态。' );
-		window.location.reload();
+	/* 失败了也同步一次:界面已经先动了,得回到服务器上的真实状态。 */
+	function write( action, payload ) {
+		writing++;
+		version++;
+		return post( action, payload ).then( function ( data ) {
+			writing--;
+			refresh();
+			return data;
+		}, function ( error ) {
+			writing--;
+			refresh();
+			throw error;
+		} );
 	}
 
-	/* ---------- 视图上的零碎更新 ---------- */
+	/* 连着几次写(拖进某天紧跟着写顺序、连点几个勾)只同步一次。 */
+	function refresh() {
+		if ( ! root ) {
+			return;
+		}
+		window.clearTimeout( timer );
+		timer = window.setTimeout( load, 100 );
+	}
+
+	function dragging() {
+		return !! document.querySelector( '.is-dragging' );
+	}
+
+	function load() {
+		if ( writing ) {
+			return; // 那次写回来时会再叫一次
+		}
+		if ( dragging() ) {
+			afterDrag = true;
+			return;
+		}
+
+		var asked = version;
+		var todoId = currentTodo();
+		post( 'view', {
+			week: root.dataset.week,
+			tag: root.dataset.tag || '0',
+			todo_id: todoId
+		} ).then( function ( data ) {
+			if ( asked !== version ) {
+				return;
+			}
+			if ( dragging() ) {
+				afterDrag = true;
+				return;
+			}
+			apply( data, todoId );
+		} ).catch( function ( error ) {
+			window.console && console.error( '[week-plan] 同步失败', error );
+		} );
+	}
+
+	document.addEventListener( 'dragend', function () {
+		if ( afterDrag ) {
+			afterDrag = false;
+			refresh();
+		}
+	} );
+
+	function fromHTML( html ) {
+		var holder = document.createElement( 'div' );
+		holder.innerHTML = ( html || '' ).trim();
+		return holder.firstElementChild;
+	}
+
+	/* 整块换掉一个 <details>,开合沿用眼下的 —— 不然每同步一次就弹开或收起一次。 */
+	function swapDetails( old, html, place ) {
+		var fresh = fromHTML( html );
+		if ( old && fresh ) {
+			fresh.open = old.open;
+			old.replaceWith( fresh );
+		} else if ( fresh ) {
+			place( fresh );
+		} else if ( old ) {
+			old.remove();
+		}
+	}
+
+	function apply( data, todoId ) {
+		var side = root.querySelector( '.weekplan-side' );
+
+		// 合并后留下的那张还在闪,换掉之后接着闪
+		var flashing = Array.prototype.map.call(
+			root.querySelectorAll( '.wp-card.is-merged' ),
+			function ( card ) {
+				return card.dataset.schedule;
+			}
+		);
+
+		swapDetails( side.querySelector( '.wp-overdue' ), data.overdue, function ( el ) {
+			side.prepend( el );
+		} );
+
+		// 正在就地改某个标签时不换,不然打到一半的名字就没了
+		if ( ! side.querySelector( '.wp-tagrow.is-editing' ) ) {
+			swapDetails( side.querySelector( '.wp-taggroup' ), data.tags, function () {} );
+		}
+
+		// 平铺列表只换里面的条目:外面那层被分组视图盯着,换掉就盯丢了
+		[ 'scheduled', 'unscheduled' ].forEach( function ( key ) {
+			var flat = side.querySelector( '.wp-group-body[data-split="' + key + '"] > .wp-flat' );
+			if ( flat ) {
+				flat.innerHTML = data[ key ];
+			}
+		} );
+		var unscheduled = side.querySelector( '.wp-unscheduled-count' );
+		if ( unscheduled ) {
+			unscheduled.textContent = data.unscheduled_count;
+		}
+
+		root.querySelectorAll( '.weekplan-day-body[data-date]' ).forEach( function ( body ) {
+			if ( Object.prototype.hasOwnProperty.call( data.days, body.dataset.date ) ) {
+				body.innerHTML = data.days[ body.dataset.date ];
+			}
+		} );
+		refreshCounts();
+
+		flashing.forEach( function ( id ) {
+			var card = root.querySelector( '.weekplan-day-body .wp-card[data-schedule="' + id + '"]' );
+			if ( card ) {
+				card.classList.add( 'is-merged' );
+				window.setTimeout( function () {
+					card.classList.remove( 'is-merged' );
+				}, 1600 );
+			}
+		} );
+
+		// 详情栏只换排期一览;取的路上换成了别的待办,这份就不是它的
+		var panel = document.getElementById( 'weekplan-detail' );
+		if ( panel && todoId && todoId === currentTodo() ) {
+			if ( data.detail_gone ) {
+				panel.innerHTML = data.detail_gone;
+			} else if ( data.detail ) {
+				var box = panel.querySelector( '.wp-detail-schedule' );
+				var fresh = fromHTML( data.detail );
+				if ( box && fresh ) {
+					box.replaceWith( fresh );
+				}
+			}
+		}
+
+		markSelected( currentTodo() );
+	}
+
+	/* 详情栏开着哪条待办 */
+	function currentTodo() {
+		var box = document.querySelector( '#weekplan-detail [data-todo]' );
+		return box ? box.dataset.todo : '';
+	}
+
+	function markSelected( todoId ) {
+		document.querySelectorAll( '.is-selected' ).forEach( function ( el ) {
+			el.classList.remove( 'is-selected' );
+		} );
+		if ( ! todoId ) {
+			return;
+		}
+		document.querySelectorAll(
+			'.wp-card[data-todo="' + todoId + '"], .wp-item[data-todo="' + todoId + '"]'
+		).forEach( function ( el ) {
+			el.classList.add( 'is-selected' );
+		} );
+	}
 
 	function refreshCounts() {
 		document.querySelectorAll( '.weekplan-day' ).forEach( function ( day ) {
@@ -65,21 +230,49 @@
 		} );
 	}
 
-	/* 逾期区的「N 条」是服务端渲染的,卡片被拖走后要自己跟上;空了整块收掉。 */
-	function refreshOverdue() {
-		var box = document.querySelector( '.wp-overdue' );
-		if ( ! box ) {
-			return;
-		}
-		var count = box.querySelectorAll( '.wp-card' ).length;
-		if ( ! count ) {
-			box.remove();
-			return;
-		}
-		var label = box.querySelector( '.wp-overdue-count' );
-		if ( label ) {
-			label.textContent = count;
-		}
+	/* 待办删掉后,先把页面上它的卡片和条目拿掉,其余的等同步。 */
+	function forget( todoId ) {
+		document.querySelectorAll(
+			'.wp-card[data-todo="' + todoId + '"], .wp-item[data-todo="' + todoId + '"]'
+		).forEach( function ( el ) {
+			el.remove();
+		} );
+		refreshCounts();
+	}
+
+	return {
+		post: post,
+		write: write,
+		currentTodo: currentTodo,
+		markSelected: markSelected,
+		refreshCounts: refreshCounts,
+		forget: forget,
+		openTodo: null   // 详情栏那块挂上来
+	};
+}() );
+
+/*
+ * 四种拖拽手势:
+ *   侧栏 → 某一天       新增一条排期,待办本身留在侧栏
+ *   某一天 → 另一天     只移动被拖的这一天,不是整体平移
+ *   某一天 → 侧栏       删掉这一天的排期
+ *   同一天内上下拖      调整当天顺序
+ *
+ * 界面先动、请求后发。手上刚做完的动作立刻看到结果,其余各处(左栏进度、
+ * 「未来计划」挪到「待办」、详情栏的排期一览)等 write() 同步;失败了整页
+ * 重载回到服务器的真实状态 —— 拖拽的手感经不起等一个来回。
+ */
+( function () {
+	'use strict';
+
+	var ui = weekplanUI;
+	var dragged = null;   // { el, todoId, scheduleId, date }
+	var insertBefore = null;
+
+	function fail( error ) {
+		window.console && console.error( '[week-plan]', error );
+		window.alert( '操作没成功:' + error.message + '\n页面将重新载入,回到服务器上的真实状态。' );
+		window.location.reload();
 	}
 
 	/*
@@ -95,17 +288,6 @@
 		window.setTimeout( function () {
 			survivor.classList.remove( 'is-merged' );
 		}, 1600 );
-	}
-
-	function updateProgress( todoId, doneDays ) {
-		// 只改平铺列表里的那条;按标签分组时的克隆件由分组那块自己跟上
-		var item = document.querySelector( '.wp-flat .wp-item[data-todo="' + todoId + '"] .wp-item-meta' );
-		if ( ! item ) {
-			return;
-		}
-		var rest = item.textContent.split( ' · ' ).slice( 1 );
-		rest.unshift( doneDays > 0 ? '已完成 ' + doneDays + ' 天' : '还没开始' );
-		item.textContent = rest.join( ' · ' );
 	}
 
 	/*
@@ -128,7 +310,7 @@
 		if ( ! ids.length ) {
 			return;
 		}
-		post( 'reorder', { date: body.dataset.date, ids: ids } ).catch( fail );
+		ui.write( 'reorder', { date: body.dataset.date, ids: ids } ).catch( fail );
 	}
 
 	function clearMarks() {
@@ -255,13 +437,18 @@
 
 		// 侧栏 → 某一天:新增。卡片的 HTML 由服务器渲染,避免前后端各写一份。
 		if ( ! source.scheduleId ) {
-			post( 'add', { todo_id: source.todoId, date: date } ).then( function ( data ) {
+			ui.write( 'add', { todo_id: source.todoId, date: date } ).then( function ( data ) {
+				// 那一天已经有这条待办时服务器原样返回旧的那条,别再插一张
+				if ( body.querySelector( '.wp-card[data-schedule="' + data.schedule_id + '"]' ) ) {
+					flashMerged( body, source.todoId );
+					return;
+				}
 				var holder = document.createElement( 'div' );
 				holder.innerHTML = ( data.html || '' ).trim();
 				var card = holder.firstElementChild;
 				if ( card ) {
 					body.insertBefore( card, anchor );
-					refreshCounts();
+					ui.refreshCounts();
 					pushOrder( body );
 				}
 			} ).catch( fail );
@@ -280,14 +467,13 @@
 		body.insertBefore( source.el, anchor );
 		source.el.dataset.date = date;
 
-		post( 'move', { schedule_id: source.scheduleId, date: date } ).then( function ( data ) {
+		ui.write( 'move', { schedule_id: source.scheduleId, date: date } ).then( function ( data ) {
 			// 目标日已经有同一个待办,服务器把两条并成一条 —— 这里也要去重
 			if ( data.merged ) {
 				source.el.remove();
 				flashMerged( body, source.todoId );
 			}
-			refreshCounts();
-			refreshOverdue();
+			ui.refreshCounts();
 			pushOrder( body );
 			if ( origin && origin !== body ) {
 				pushOrder( origin );
@@ -300,9 +486,8 @@
 		var origin = source.el.parentElement;
 
 		source.el.remove();
-		post( 'remove', { schedule_id: source.scheduleId } ).then( function () {
-			refreshCounts();
-			refreshOverdue();
+		ui.write( 'remove', { schedule_id: source.scheduleId } ).then( function () {
+			ui.refreshCounts();
 			if ( origin ) {
 				pushOrder( origin );
 			}
@@ -315,7 +500,9 @@
 		if ( ! event.target.closest ) {
 			return;
 		}
-		var button = event.target.closest( '.wp-check' );
+		// 只认卡片上的勾。详情栏的子任务也用 .wp-check 的样子,早先这里没
+		// 分开:点子任务的勾,详情栏那边翻一次、这里又翻回去,图标就不动了
+		var button = event.target.closest( '.wp-card .wp-check' );
 		if ( ! button ) {
 			return;
 		}
@@ -326,9 +513,7 @@
 		button.setAttribute( 'aria-pressed', wasDone ? 'false' : 'true' );
 		card.classList.toggle( 'is-done', ! wasDone );
 
-		post( 'toggle', { schedule_id: card.dataset.schedule } ).then( function ( data ) {
-			updateProgress( card.dataset.todo, data.done_days );
-		} ).catch( fail );
+		ui.write( 'toggle', { schedule_id: card.dataset.schedule } ).catch( fail );
 	} );
 }() );
 
@@ -341,87 +526,63 @@
 ( function () {
 	'use strict';
 
-	var config = window.weekplanData || {};
+	var ui = weekplanUI;
 	var panel = document.getElementById( 'weekplan-detail' );
 	if ( ! panel ) {
 		return;
 	}
 
-	var noteTimer = null;
-
-	function post( action, payload ) {
-		var body = new URLSearchParams();
-		body.set( 'action', 'weekplan_' + action );
-		body.set( 'nonce', config.nonce );
-		Object.keys( payload ).forEach( function ( key ) {
-			body.set( key, payload[ key ] );
-		} );
-
-		return fetch( config.ajaxUrl, {
-			method: 'POST',
-			credentials: 'same-origin',
-			body: body
-		} ).then( function ( response ) {
-			return response.json();
-		} ).then( function ( json ) {
-			if ( ! json || ! json.success ) {
-				throw new Error( ( json && json.data && json.data.message ) || '请求失败' );
-			}
-			return json.data || {};
-		} );
-	}
+	var note = null;     // 还没存的笔记:{ todoId, value, timer }
+	var opening = 0;     // 最后一次点开的编号:点得快时,先发的请求可能后回来
 
 	function complain( error ) {
 		window.console && console.error( '[week-plan]', error );
 		window.alert( '没保存成功:' + error.message );
 	}
 
-	function currentTodo() {
-		var box = panel.querySelector( '[data-todo]' );
-		return box ? box.dataset.todo : '';
-	}
-
-	/* 保存后侧栏那条要跟着变(标题、进度、标签都可能改了) */
-	function replaceSidebarItem( todoId, html ) {
-		var old = document.querySelector( '.wp-flat .wp-item[data-todo="' + todoId + '"]' );
-		if ( ! old || ! html ) {
-			return;
-		}
-		var holder = document.createElement( 'div' );
-		holder.innerHTML = html.trim();
-		var fresh = holder.firstElementChild;
-		if ( fresh ) {
-			old.replaceWith( fresh );
-		}
-	}
-
-	function save( field, value ) {
-		var todoId = currentTodo();
+	/*
+	 * 笔记和子任务只在详情栏里看得到,存了不必同步别处;其余字段会改到
+	 * 左栏和卡片,走 write() 让页面跟上。
+	 */
+	function save( field, value, todoId ) {
+		todoId = todoId || ui.currentTodo();
 		if ( ! todoId ) {
 			return Promise.resolve( {} );
 		}
-		return post( 'save', { todo_id: todoId, field: field, value: value } )
-			.then( function ( data ) {
-				replaceSidebarItem( todoId, data.item_html );
-				return data;
-			} )
-			.catch( complain );
+		var send = ( 'note' === field || 'subtasks' === field ) ? ui.post : ui.write;
+		return send( 'save', { todo_id: todoId, field: field, value: value } ).catch( complain );
+	}
+
+	/*
+	 * 把还在防抖里的笔记立刻存掉。存哪条待办在打字时就记下了 —— 早先是
+	 * 到点才看详情栏开着哪条,打完字马上点开另一条,笔记就存进了另一条里。
+	 */
+	function flushNote() {
+		if ( ! note ) {
+			return Promise.resolve();
+		}
+		var pending = note;
+		note = null;
+		window.clearTimeout( pending.timer );
+		return save( 'note', pending.value, pending.todoId );
 	}
 
 	function openTodo( todoId ) {
-		document.querySelectorAll( '.is-selected' ).forEach( function ( el ) {
-			el.classList.remove( 'is-selected' );
-		} );
-		document.querySelectorAll( '[data-todo="' + todoId + '"]' ).forEach( function ( el ) {
-			if ( el.classList.contains( 'wp-card' ) || el.classList.contains( 'wp-item' ) ) {
-				el.classList.add( 'is-selected' );
-			}
-		} );
+		var ticket = ++opening;
+		ui.markSelected( todoId );
 
-		post( 'detail', { todo_id: todoId } ).then( function ( data ) {
+		// 先等笔记存完再取,不然取回来的可能是存之前的旧笔记
+		flushNote().then( function () {
+			return ui.post( 'detail', { todo_id: todoId } );
+		} ).then( function ( data ) {
+			if ( ticket !== opening ) {
+				return;
+			}
 			panel.innerHTML = data.html || '';
+			ui.markSelected( todoId );
 		} ).catch( complain );
 	}
+	ui.openTodo = openTodo;
 
 	/* ---------- 选中 ---------- */
 
@@ -450,21 +611,11 @@
 			return;
 		}
 
-		post( 'create', { title: title } ).then( function ( data ) {
-			// 新待办没有排期,落在「未来计划」里。塞进平铺列表,分组视图会自己跟上。
-			var target = document.querySelector( '.wp-group-body[data-split="unscheduled"] .wp-flat' );
-			if ( target ) {
-				var empty = target.querySelector( '.weekplan-empty' );
-				if ( empty ) {
-					empty.remove();
-				}
-				var holder = document.createElement( 'div' );
-				holder.innerHTML = ( data.item_html || '' ).trim();
-				if ( holder.firstElementChild ) {
-					target.prepend( holder.firstElementChild );
-				}
-			}
+		// 新待办没有排期,同步回来后出现在「未来计划」里
+		ui.write( 'create', { title: title } ).then( function ( data ) {
+			opening++; // 还在路上的「点开」作废,别把新建的这条顶掉
 			panel.innerHTML = data.detail_html || '';
+			ui.markSelected( String( data.todo_id ) );
 			var titleInput = panel.querySelector( '[data-field="title"]' );
 			if ( titleInput ) {
 				titleInput.focus();
@@ -487,11 +638,14 @@
 		if ( 'note' !== ( event.target.dataset && event.target.dataset.field ) ) {
 			return;
 		}
-		var value = event.target.value;
-		window.clearTimeout( noteTimer );
-		noteTimer = window.setTimeout( function () {
-			save( 'note', value );
-		}, 700 );
+		if ( note ) {
+			window.clearTimeout( note.timer );
+		}
+		note = {
+			todoId: ui.currentTodo(),
+			value: event.target.value,
+			timer: window.setTimeout( flushNote, 700 )
+		};
 	} );
 
 	/* ---------- 结项 / 删除 ---------- */
@@ -502,29 +656,25 @@
 			var turningOn = ! finish.classList.contains( 'is-on' );
 			finish.classList.toggle( 'is-on', turningOn );
 			finish.textContent = turningOn ? '已结项 · 点击恢复' : '标记为结项';
-			save( 'finished', turningOn ? '1' : '0' ).then( function () {
-				document.querySelectorAll( '.wp-card[data-todo="' + currentTodo() + '"]' )
-					.forEach( function ( card ) {
-						card.classList.toggle( 'is-finished', turningOn );
-					} );
-			} );
+			// 卡片的结项角标、左栏收走这一条,都等同步
+			save( 'finished', turningOn ? '1' : '0' );
 			return;
 		}
 
 		var del = event.target.closest( '.wp-del-todo' );
 		if ( del ) {
-			var todoId = currentTodo();
+			var todoId = ui.currentTodo();
 			if ( ! todoId || ! window.confirm( '删掉这条待办?它的所有排期也会一起消失,不能撤销。' ) ) {
 				return;
 			}
-			post( 'delete', { todo_id: todoId } ).then( function () {
-				document.querySelectorAll( '[data-todo="' + todoId + '"]' ).forEach( function ( el ) {
-					if ( el.classList.contains( 'wp-card' ) || el.classList.contains( 'wp-item' ) ) {
-						el.remove();
-					}
-				} );
-				panel.innerHTML = '<div class="wp-group wp-detail"><div class="wp-group-head">详情</div>' +
-					'<p class="weekplan-empty">点一条待办,在这里编辑。</p></div>';
+			// 这条的笔记还没存的就不存了,不然会对着删掉的待办报「不存在」
+			if ( note && note.todoId === todoId ) {
+				window.clearTimeout( note.timer );
+				note = null;
+			}
+			// 详情栏回到空状态、各处计数,都等同步
+			ui.write( 'delete', { todo_id: todoId } ).then( function () {
+				ui.forget( todoId );
 			} ).catch( complain );
 		}
 	} );
@@ -542,8 +692,9 @@
 
 	function saveTags() {
 		save( 'tags', tagNames().join( '\n' ) ).then( function () {
-			// 标签变了,卡片上的色带和小签也要重画 —— 重新拉一次详情最省事
-			openTodo( currentTodo() );
+			// 卡片和左栏的色带、小签由同步重画;详情栏里新加的小签还没颜色,
+			// 重新拉一次详情
+			openTodo( ui.currentTodo() );
 		} );
 	}
 
@@ -626,6 +777,16 @@
 				};
 			}
 		);
+
+		// 标题上的「2/3」跟着变,和服务端渲染的写法一致
+		var label = panel.querySelector( '.wp-sub-label' );
+		if ( label ) {
+			var done = items.filter( function ( item ) {
+				return item.done;
+			} ).length;
+			label.textContent = '子任务' + ( items.length ? ' · ' + done + '/' + items.length : '' );
+		}
+
 		save( 'subtasks', JSON.stringify( items ) );
 	}
 }() );
@@ -633,34 +794,20 @@
 /*
  * 标签的就地编辑。
  *
- * 点铅笔把那一行换成「名字 + 颜色 + 保存/删除」,改完刷新页面 —— 标签色
- * 散落在周视图和侧栏的每一张卡片上,局部更新要碰的地方太多,不值得。
+ * 点铅笔把那一行换成「名字 + 颜色 + 保存/删除」。标签色散落在周视图和
+ * 侧栏的每一张卡片上,改完由 write() 整块同步;详情栏里的小签另外重拉一次。
  */
 ( function () {
 	'use strict';
 
-	var config = window.weekplanData || {};
+	var ui = weekplanUI;
 
-	function post( action, payload ) {
-		var body = new URLSearchParams();
-		body.set( 'action', 'weekplan_' + action );
-		body.set( 'nonce', config.nonce );
-		Object.keys( payload ).forEach( function ( key ) {
-			body.set( key, payload[ key ] );
-		} );
-
-		return fetch( config.ajaxUrl, {
-			method: 'POST',
-			credentials: 'same-origin',
-			body: body
-		} ).then( function ( r ) {
-			return r.json();
-		} ).then( function ( json ) {
-			if ( ! json || ! json.success ) {
-				throw new Error( ( json && json.data && json.data.message ) || '请求失败' );
-			}
-			return json.data || {};
-		} );
+	function done( row ) {
+		closeEditor( row );
+		var todoId = ui.currentTodo();
+		if ( todoId && ui.openTodo ) {
+			ui.openTodo( todoId );
+		}
 	}
 
 	function closeEditor( row ) {
@@ -702,12 +849,12 @@
 		var save = event.target.closest( '.wp-tag-ok' );
 		if ( save ) {
 			var saveRow = save.closest( '.wp-tagrow' );
-			post( 'tag_save', {
+			ui.write( 'tag_save', {
 				term_id: saveRow.dataset.term,
 				name: saveRow.querySelector( '.wp-tagname' ).value,
 				color: saveRow.querySelector( '.wp-tagcolor' ).value
 			} ).then( function () {
-				window.location.reload();
+				done( saveRow );
 			} ).catch( function ( error ) {
 				window.alert( error.message );
 			} );
@@ -720,8 +867,8 @@
 			if ( ! window.confirm( '删掉标签「' + rmRow.dataset.name + '」?待办本身不会被删,只是不再挂这个标签。' ) ) {
 				return;
 			}
-			post( 'tag_delete', { term_id: rmRow.dataset.term } ).then( function () {
-				window.location.reload();
+			ui.write( 'tag_delete', { term_id: rmRow.dataset.term } ).then( function () {
+				done( rmRow );
 			} ).catch( function ( error ) {
 				window.alert( error.message );
 			} );
@@ -733,12 +880,12 @@
  * 批量排期对话框。
  *
  * 用原生 <dialog>,自带模态遮罩、Esc 关闭和焦点管理,不需要任何库。
- * 排完刷新页面 —— 生成的日子多半落在当前这一周之外,局部更新没意义。
+ * 排完由 write() 同步:这一周的卡片、左栏进度、详情栏的排期一览都跟上。
  */
 ( function () {
 	'use strict';
 
-	var config = window.weekplanData || {};
+	var ui = weekplanUI;
 	var dialog = document.getElementById( 'weekplan-batch' );
 	var panel = document.getElementById( 'weekplan-detail' );
 	if ( ! dialog || ! panel ) {
@@ -805,28 +952,13 @@
 	} );
 
 	document.getElementById( 'weekplan-batch-go' ).addEventListener( 'click', function () {
-		var body = new URLSearchParams();
-		body.set( 'action', 'weekplan_batch' );
-		body.set( 'nonce', config.nonce );
-		body.set( 'todo_id', todoId );
-		body.set( 'from', fromInput.value );
-		body.set( 'to', toInput.value );
-		pickedWeekdays().forEach( function ( day ) {
-			body.append( 'weekdays[]', day );
-		} );
-
-		fetch( config.ajaxUrl, {
-			method: 'POST',
-			credentials: 'same-origin',
-			body: body
-		} ).then( function ( r ) {
-			return r.json();
-		} ).then( function ( json ) {
-			if ( ! json || ! json.success ) {
-				throw new Error( ( json && json.data && json.data.message ) || '请求失败' );
-			}
+		ui.write( 'batch', {
+			todo_id: todoId,
+			from: fromInput.value,
+			to: toInput.value,
+			weekdays: pickedWeekdays()
+		} ).then( function () {
 			dialog.close();
-			window.location.reload();
 		} ).catch( function ( error ) {
 			window.alert( error.message );
 		} );
@@ -842,30 +974,8 @@
 ( function () {
 	'use strict';
 
-	var config = window.weekplanData || {};
+	var ui = weekplanUI;
 	var menu = null;
-
-	function post( action, payload ) {
-		var body = new URLSearchParams();
-		body.set( 'action', 'weekplan_' + action );
-		body.set( 'nonce', config.nonce );
-		Object.keys( payload ).forEach( function ( key ) {
-			body.set( key, payload[ key ] );
-		} );
-
-		return fetch( config.ajaxUrl, {
-			method: 'POST',
-			credentials: 'same-origin',
-			body: body
-		} ).then( function ( r ) {
-			return r.json();
-		} ).then( function ( json ) {
-			if ( ! json || ! json.success ) {
-				throw new Error( ( json && json.data && json.data.message ) || '请求失败' );
-			}
-			return json.data || {};
-		} );
-	}
 
 	function closeMenu() {
 		if ( menu ) {
@@ -874,16 +984,15 @@
 		}
 	}
 
-	function run( promise ) {
-		promise.then( function () {
-			window.location.reload();
-		} ).catch( function ( error ) {
+	/* 做完由 write() 同步,不再整页重载 —— 滚动位置和详情栏都留着。 */
+	function run( action, payload ) {
+		return ui.write( action, payload ).catch( function ( error ) {
 			window.alert( error.message );
 		} );
 	}
 
 	function shift( todoId, days ) {
-		run( post( 'shift', { todo_id: todoId, days: days } ) );
+		run( 'shift', { todo_id: todoId, days: days } );
 	}
 
 	document.addEventListener( 'contextmenu', function ( event ) {
@@ -945,13 +1054,15 @@
 
 		if ( scheduleId ) {
 			item( '取消这一天的排期', function () {
-				run( post( 'remove', { schedule_id: scheduleId } ) );
+				run( 'remove', { schedule_id: scheduleId } );
 			} );
 		}
 
 		item( '删除这条待办', function () {
 			if ( window.confirm( '删掉这条待办?它的所有排期也会一起消失,不能撤销。' ) ) {
-				run( post( 'delete', { todo_id: todoId } ) );
+				run( 'delete', { todo_id: todoId } ).then( function () {
+					ui.forget( todoId );
+				} );
 			}
 		}, true );
 

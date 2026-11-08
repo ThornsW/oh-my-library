@@ -1,6 +1,6 @@
 # week-plan · 周计划
 
-版本：0.3.0
+版本：0.4.0
 
 WordPress 插件：把待办按天排进一周的计划表。界面在 wp-admin 后台，单用户使用。
 
@@ -32,7 +32,7 @@ rsync -a --exclude='*.md' Blog/week-plan/plugin/week-plan/ /path/to/wordpress/wp
 
 ```bash
 cd Blog/week-plan/plugin
-zip -qr ~/week-plan-0.3.0.zip week-plan -x "*.md"
+zip -qr ~/week-plan-0.4.0.zip week-plan -x "*.md"
 ```
 
 在后台「插件」里启用「周计划」。启用时会自动建一张排期表 `<表前缀>weekplan_schedule`。

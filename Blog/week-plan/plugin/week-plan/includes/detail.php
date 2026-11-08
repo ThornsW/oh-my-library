@@ -33,7 +33,6 @@ function weekplan_render_detail( int $todo_id ): void {
 	$subtasks  = weekplan_get_subtasks( $todo_id );
 	$all_tags  = weekplan_all_tags();
 	$tag_names = wp_list_pluck( $todo['tags'], 'name' );
-	$dates     = weekplan_todo_dates( $todo_id );
 	?>
 	<div class="wp-group wp-detail" data-todo="<?php echo esc_attr( (string) $todo_id ); ?>">
 		<div class="wp-group-head">
@@ -92,7 +91,7 @@ function weekplan_render_detail( int $todo_id ): void {
 			</div>
 
 			<div class="wp-field">
-				<span class="wp-label">子任务<?php echo $subtasks ? ' · ' . count( array_filter( $subtasks, static fn( $s ) => $s['done'] ) ) . '/' . count( $subtasks ) : ''; ?></span>
+				<span class="wp-label wp-sub-label">子任务<?php echo $subtasks ? ' · ' . count( array_filter( $subtasks, static fn( $s ) => $s['done'] ) ) . '/' . count( $subtasks ) : ''; ?></span>
 				<ul class="wp-subtasks">
 					<?php foreach ( $subtasks as $index => $item ) : ?>
 						<li class="wp-subtask<?php echo $item['done'] ? ' is-done' : ''; ?>" data-index="<?php echo esc_attr( (string) $index ); ?>">
@@ -122,21 +121,36 @@ function weekplan_render_detail( int $todo_id ): void {
 					排期
 					<button type="button" class="wp-batch-open" title="按区间和星期几一次排多天">批量排期</button>
 				</span>
-				<p class="wp-detail-progress"><?php echo esc_html( weekplan_progress_label( $todo ) ); ?></p>
-				<?php if ( $dates ) : ?>
-					<div class="wp-datechips">
-						<?php foreach ( $dates as $row ) : ?>
-							<span class="wp-datechip<?php echo $row['done'] ? ' is-done' : ''; ?>"
-								style="--wp-accent: <?php echo esc_attr( $todo['accent'] ); ?>">
-								<?php echo esc_html( $row['label'] ); ?>
-							</span>
-						<?php endforeach; ?>
-					</div>
-				<?php else : ?>
-					<p class="weekplan-empty">还没排期。把它从左栏拖进某一天。</p>
-				<?php endif; ?>
+				<?php weekplan_render_detail_schedule( $todo ); ?>
 			</div>
 		</div>
+	</div>
+	<?php
+}
+
+/**
+ * 详情栏里的「已完成 N 天」和排期日期一览。
+ *
+ * 单独成块,是因为打勾、拖拽、批量排期、顺延都会改它,而这时详情栏的
+ * 输入框里可能正有没存完的字 —— 只换这一块,不动整个详情栏。
+ */
+function weekplan_render_detail_schedule( array $todo ): void {
+	$dates = weekplan_todo_dates( $todo['id'] );
+	?>
+	<div class="wp-detail-schedule">
+		<p class="wp-detail-progress"><?php echo esc_html( weekplan_progress_label( $todo ) ); ?></p>
+		<?php if ( $dates ) : ?>
+			<div class="wp-datechips">
+				<?php foreach ( $dates as $row ) : ?>
+					<span class="wp-datechip<?php echo $row['done'] ? ' is-done' : ''; ?>"
+						style="--wp-accent: <?php echo esc_attr( $todo['accent'] ); ?>">
+						<?php echo esc_html( $row['label'] ); ?>
+					</span>
+				<?php endforeach; ?>
+			</div>
+		<?php else : ?>
+			<p class="weekplan-empty">还没排期。把它从左栏拖进某一天。</p>
+		<?php endif; ?>
 	</div>
 	<?php
 }

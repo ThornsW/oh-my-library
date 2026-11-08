@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 const WEEKPLAN_NONCE = 'weekplan_action';
 
 function weekplan_register_ajax(): void {
-	$actions = array( 'add', 'move', 'remove', 'reorder', 'toggle', 'detail', 'create', 'save', 'delete', 'tag_save', 'tag_delete', 'batch', 'shift', 'preview', 'memo' );
+	$actions = array( 'add', 'move', 'remove', 'reorder', 'toggle', 'detail', 'create', 'save', 'delete', 'tag_save', 'tag_delete', 'batch', 'shift', 'preview', 'memo', 'view' );
 	foreach ( $actions as $action ) {
 		add_action( "wp_ajax_weekplan_$action", "weekplan_ajax_$action" );
 	}
@@ -110,17 +110,10 @@ function weekplan_ajax_create(): void {
 		weekplan_ajax_reply( $id );
 	}
 
-	ob_start();
-	weekplan_render_sidebar_item( weekplan_todo_summary( $id ) );
-	$item = (string) ob_get_clean();
-
-	ob_start();
-	weekplan_render_detail( $id );
 	weekplan_ajax_reply(
 		array(
 			'todo_id'     => $id,
-			'item_html'   => $item,
-			'detail_html' => (string) ob_get_clean(),
+			'detail_html' => weekplan_capture( 'weekplan_render_detail', $id ),
 		)
 	);
 }
@@ -164,14 +157,7 @@ function weekplan_ajax_save(): void {
 			$value = sanitize_text_field( (string) $raw );
 	}
 
-	$result = weekplan_update_todo( $id, array( $field => $value ) );
-	if ( is_wp_error( $result ) ) {
-		weekplan_ajax_reply( $result );
-	}
-
-	ob_start();
-	weekplan_render_sidebar_item( weekplan_todo_summary( $id ) );
-	weekplan_ajax_reply( array( 'item_html' => (string) ob_get_clean() ) );
+	weekplan_ajax_reply( weekplan_update_todo( $id, array( $field => $value ) ) );
 }
 
 function weekplan_ajax_delete(): void {
@@ -234,6 +220,55 @@ function weekplan_ajax_preview(): void {
 
 	$raw = isset( $_POST['value'] ) ? wp_unslash( $_POST['value'] ) : '';
 	weekplan_ajax_reply( array( 'html' => weekplan_render_markdown( (string) $raw ) ) );
+}
+
+/**
+ * 页面上会随数据变化的几块,按眼下看的那一周和标签筛选重新渲染。
+ *
+ * 前端每次写成功后取一次,整块换掉。一次改动会牵动哪些地方(改标题要动
+ * 卡片,结项要把左栏那条收走,拖进某天要把它从「未来计划」挪进「待办」)
+ * 不必逐个记着去补 —— 这里给的就是刷新整页后会看到的样子。
+ *
+ * todo_id 是详情栏正开着的那条:只回它的排期一览,详情栏里的输入框不动。
+ */
+function weekplan_ajax_view(): void {
+	weekplan_ajax_guard();
+
+	$day = weekplan_parse_date( weekplan_post_text( 'week' ) );
+	if ( null === $day ) {
+		weekplan_ajax_reply( new WP_Error( 'weekplan_bad_date', '日期格式不对。' ) );
+	}
+
+	$week_start = weekplan_week_start_of( $day );
+	$active_tag = weekplan_valid_tag( weekplan_post_int( 'tag' ) );
+	$view       = weekplan_view_data( $week_start, $active_tag );
+
+	$days = array();
+	foreach ( weekplan_week_days( $week_start ) as $item ) {
+		$days[ $item['date'] ] = weekplan_capture( 'weekplan_render_cards', $view['schedule'][ $item['date'] ] ?? array() );
+	}
+
+	$reply = array(
+		'overdue'           => weekplan_capture( 'weekplan_render_overdue', $view['overdue'] ),
+		'tags'              => weekplan_capture( 'weekplan_render_tag_group', $week_start, $active_tag ),
+		'scheduled'         => weekplan_capture( 'weekplan_render_sidebar_list', $view['sidebar']['scheduled'], WEEKPLAN_EMPTY_SCHEDULED ),
+		'unscheduled'       => weekplan_capture( 'weekplan_render_sidebar_list', $view['sidebar']['unscheduled'], WEEKPLAN_EMPTY_UNSCHEDULED ),
+		'unscheduled_count' => count( $view['sidebar']['unscheduled'] ),
+		'days'              => $days,
+	);
+
+	$todo_id = weekplan_post_int( 'todo_id' );
+	if ( $todo_id > 0 ) {
+		$todo = weekplan_todo_summary( $todo_id );
+		if ( null === $todo ) {
+			// 详情栏开着的那条已经被删了,整个详情栏回到空状态
+			$reply['detail_gone'] = weekplan_capture( 'weekplan_render_detail_empty' );
+		} else {
+			$reply['detail'] = weekplan_capture( 'weekplan_render_detail_schedule', $todo );
+		}
+	}
+
+	weekplan_ajax_reply( $reply );
 }
 
 /* ---------- 便签 ---------- */

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: 周计划
  * Description: 以周为单位的计划表。把待办排进具体的某一天,长期计划按天累计。界面在「周计划」菜单里。
- * Version:     0.3.0
+ * Version:     0.4.0
  * Author:      ThornsW
  * Requires at least: 6.0
  * Requires PHP: 8.1
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const WEEKPLAN_VERSION    = '0.3.0';
+const WEEKPLAN_VERSION    = '0.4.0';
 const WEEKPLAN_DB_VERSION = 1;
 const WEEKPLAN_POST_TYPE  = 'weekplan_todo';
 const WEEKPLAN_TAXONOMY   = 'weekplan_tag';

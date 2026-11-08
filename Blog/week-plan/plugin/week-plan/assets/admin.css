@@ -748,6 +748,11 @@
 
 /* 排期一览 */
 
+/* 这层包装只是给前端整块替换用的,不参与排版 */
+.wp-detail-schedule {
+	display: contents;
+}
+
 .wp-detail-progress {
 	margin: 0;
 	font-size: 12.5px;

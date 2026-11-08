@@ -184,6 +184,67 @@ function weekplan_render_split_toggle( string $key ): void {
 	<?php
 }
 
+/**
+ * 某一周、某个标签筛选下,页面上会随数据变化的那几块要用的数据。
+ *
+ * 整页渲染和前端改完后的同步(weekplan_ajax_view)共用这一份,两边
+ * 才不会算出两种样子。
+ *
+ * @return array{schedule: array, sidebar: array, overdue: array}
+ */
+function weekplan_view_data( DateTimeImmutable $week_start, int $active_tag ): array {
+	$week_end     = $week_start->modify( '+6 days' );
+	$this_week    = weekplan_week_start_of( weekplan_today() );
+	$is_this_week = $week_start->format( 'Y-m-d' ) === $this_week->format( 'Y-m-d' );
+
+	// 标签筛选:先算出这个标签下的待办 id,后面三个查询都按它过滤。
+	$only = $active_tag ? weekplan_todo_ids_with_tag( $active_tag ) : null;
+
+	return array(
+		'schedule' => weekplan_schedule_between( $week_start->format( 'Y-m-d' ), $week_end->format( 'Y-m-d' ), $only ),
+		'sidebar'  => weekplan_sidebar_todos( $only ),
+		// 逾期区只在看「今天所在的这一周」时出现,而且只汇总上一周。
+		'overdue'  => $is_this_week ? weekplan_overdue_last_week( $only ) : array(),
+	);
+}
+
+/** 逾期区。没有逾期就什么都不输出,整块不出现。 */
+function weekplan_render_overdue( array $overdue ): void {
+	if ( ! $overdue ) {
+		return;
+	}
+	?>
+	<details class="wp-group wp-overdue">
+		<summary>逾期 · <span class="wp-overdue-count"><?php echo count( $overdue ); ?></span> 条<span class="wp-hint">上周没做完</span></summary>
+		<div class="wp-group-body">
+			<?php weekplan_render_cards( $overdue ); ?>
+		</div>
+	</details>
+	<?php
+}
+
+function weekplan_render_cards( array $entries ): void {
+	foreach ( $entries as $entry ) {
+		weekplan_render_card( $entry );
+	}
+}
+
+/** 左栏「待办」或「未来计划」里平铺的那一串。 */
+function weekplan_render_sidebar_list( array $todos, string $empty ): void {
+	if ( ! $todos ) {
+		?>
+		<p class="weekplan-empty"><?php echo esc_html( $empty ); ?></p>
+		<?php
+		return;
+	}
+	foreach ( $todos as $todo ) {
+		weekplan_render_sidebar_item( $todo );
+	}
+}
+
+const WEEKPLAN_EMPTY_SCHEDULED   = '还没有排过期的待办。';
+const WEEKPLAN_EMPTY_UNSCHEDULED = '空的。';
+
 function weekplan_render_admin_page(): void {
 	if ( ! current_user_can( 'manage_options' ) ) {
 		wp_die( '权限不足。' );
@@ -195,16 +256,15 @@ function weekplan_render_admin_page(): void {
 	$this_week    = weekplan_week_start_of( weekplan_today() );
 	$is_this_week = $week_start->format( 'Y-m-d' ) === $this_week->format( 'Y-m-d' );
 
-	// 标签筛选:先算出这个标签下的待办 id,后面三个查询都按它过滤。
 	$active_tag = weekplan_requested_tag();
-	$only       = $active_tag ? weekplan_todo_ids_with_tag( $active_tag ) : null;
-
-	$schedule = weekplan_schedule_between( $week_start->format( 'Y-m-d' ), $week_end->format( 'Y-m-d' ), $only );
-	$sidebar  = weekplan_sidebar_todos( $only );
-	// 逾期区只在看「今天所在的这一周」时出现,而且只汇总上一周。
-	$overdue  = $is_this_week ? weekplan_overdue_last_week( $only ) : array();
+	$view       = weekplan_view_data( $week_start, $active_tag );
+	$schedule   = $view['schedule'];
+	$sidebar    = $view['sidebar'];
+	// data-week / data-tag 告诉前端这一页看的是什么,改完同步时按它重新取
 	?>
-	<div class="wrap weekplan">
+	<div class="wrap weekplan"
+		data-week="<?php echo esc_attr( $week_start->format( 'Y-m-d' ) ); ?>"
+		data-tag="<?php echo esc_attr( (string) $active_tag ); ?>">
 		<div class="weekplan-bar">
 			<h1 class="weekplan-title">周计划</h1>
 			<span class="weekplan-range">
@@ -222,16 +282,7 @@ function weekplan_render_admin_page(): void {
 
 		<div class="weekplan-layout">
 			<aside class="weekplan-side" data-drop="sidebar">
-				<?php if ( $overdue ) : ?>
-					<details class="wp-group wp-overdue">
-						<summary>逾期 · <span class="wp-overdue-count"><?php echo count( $overdue ); ?></span> 条<span class="wp-hint">上周没做完</span></summary>
-						<div class="wp-group-body">
-							<?php foreach ( $overdue as $entry ) : ?>
-								<?php weekplan_render_card( $entry ); ?>
-							<?php endforeach; ?>
-						</div>
-					</details>
-				<?php endif; ?>
+				<?php weekplan_render_overdue( $view['overdue'] ); ?>
 
 				<?php weekplan_render_tag_group( $week_start, $active_tag ); ?>
 
@@ -243,28 +294,16 @@ function weekplan_render_admin_page(): void {
 					</div>
 					<div class="wp-group-body" data-split="scheduled">
 						<div class="wp-flat">
-							<?php if ( $sidebar['scheduled'] ) : ?>
-								<?php foreach ( $sidebar['scheduled'] as $todo ) : ?>
-									<?php weekplan_render_sidebar_item( $todo ); ?>
-								<?php endforeach; ?>
-							<?php else : ?>
-								<p class="weekplan-empty">还没有排过期的待办。</p>
-							<?php endif; ?>
+							<?php weekplan_render_sidebar_list( $sidebar['scheduled'], WEEKPLAN_EMPTY_SCHEDULED ); ?>
 						</div>
 					</div>
 				</div>
 
 				<details class="wp-group" open>
-					<summary>未来计划 · <?php echo count( $sidebar['unscheduled'] ); ?> 条<?php weekplan_render_split_toggle( 'unscheduled' ); ?></summary>
+					<summary>未来计划 · <span class="wp-unscheduled-count"><?php echo count( $sidebar['unscheduled'] ); ?></span> 条<?php weekplan_render_split_toggle( 'unscheduled' ); ?></summary>
 					<div class="wp-group-body" data-split="unscheduled">
 						<div class="wp-flat">
-							<?php if ( $sidebar['unscheduled'] ) : ?>
-								<?php foreach ( $sidebar['unscheduled'] as $todo ) : ?>
-									<?php weekplan_render_sidebar_item( $todo ); ?>
-								<?php endforeach; ?>
-							<?php else : ?>
-								<p class="weekplan-empty">空的。</p>
-							<?php endif; ?>
+							<?php weekplan_render_sidebar_list( $sidebar['unscheduled'], WEEKPLAN_EMPTY_UNSCHEDULED ); ?>
 						</div>
 					</div>
 				</details>
@@ -288,9 +327,7 @@ function weekplan_render_admin_page(): void {
 							<span class="weekplan-day-count"><?php echo $entries ? esc_html( count( $entries ) . ' 项' ) : ''; ?></span>
 						</header>
 						<div class="weekplan-day-body" data-drop="day" data-date="<?php echo esc_attr( $day['date'] ); ?>">
-							<?php foreach ( $entries as $entry ) : ?>
-								<?php weekplan_render_card( $entry ); ?>
-							<?php endforeach; ?>
+							<?php weekplan_render_cards( $entries ); ?>
 						</div>
 					</section>
 				<?php endforeach; ?>
@@ -309,16 +346,25 @@ function weekplan_render_admin_page(): void {
 	<?php
 }
 
+/** 把一个渲染函数的输出收成字符串,给 AJAX 回传 HTML 用。 */
+function weekplan_capture( callable $render, mixed ...$args ): string {
+	ob_start();
+	$render( ...$args );
+	return (string) ob_get_clean();
+}
+
 /** 新增排期后要把卡片塞回页面,HTML 由服务器渲染,前后端不各写一份。 */
 function weekplan_card_html( array $entry ): string {
-	ob_start();
-	weekplan_render_card( $entry );
-	return (string) ob_get_clean();
+	return weekplan_capture( 'weekplan_render_card', $entry );
 }
 
 /** 当前生效的标签筛选,没有或不合法就返回 0。 */
 function weekplan_requested_tag(): int {
-	$raw = isset( $_GET['tag'] ) ? (int) $_GET['tag'] : 0;
+	return weekplan_valid_tag( isset( $_GET['tag'] ) ? (int) $_GET['tag'] : 0 );
+}
+
+/** 标签 id 不存在就当没筛选。 */
+function weekplan_valid_tag( int $raw ): int {
 	if ( $raw <= 0 ) {
 		return 0;
 	}
