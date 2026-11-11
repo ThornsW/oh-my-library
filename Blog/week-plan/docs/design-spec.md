@@ -258,7 +258,7 @@ CREATE TABLE {$wpdb->prefix}weekplan_schedule (
 
 ## 8. 部署
 
-部署方式：把 `plugin/week-plan/` 整个目录拷到 `wp-content/plugins/week-plan/`。
+部署方式：把 `plugin/week-plan/` 拷到 `wp-content/plugins/week-plan/`，排除 `*.md`（Web 服务器会把它们原样公开）。
 
 选插件而不选独立服务，是冲着小内存云主机的约束去的：
 
