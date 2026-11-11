@@ -40,8 +40,7 @@
 - `tools/fetch-covers-local.py` 和 `tools/fetch-links-local.py` 使用 Python 3.7+
   标准库。
 - `examples/xlsx_to_json.py` 依赖 `openpyxl`。
-- 项目目前没有固定 Python 环境。运行工具或安装依赖前先确认使用哪个环境。
-- 出现稳定的第三方依赖后，再建立 `environment.yml` 和独立 mamba 环境。
+- 默认用 miniforge 的 `GeneralDev` 环境，依赖清单见 `requirements.txt`。
 
 ## 验证
 
