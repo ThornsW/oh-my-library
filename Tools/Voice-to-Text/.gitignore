@@ -12,3 +12,6 @@ __pycache__/
 # Single-file build output (./build.sh)
 /voice-to-text
 /voice-to-text.tmp
+
+# AI assistant notes, local only
+AGENTS.md
