@@ -1,5 +1,7 @@
 # New Todo Dialog Design
 
+> **历史档案：** 本设计已于 2026-05-05 实现，当前行为以代码和测试为准。
+
 ## Goal
 
 Replace the current title-only new todo prompt with a full creation dialog. When the user clicks "新建" or presses `Ctrl+N`, they can set the todo title, tags, subtasks, due date, and priority before the todo is created.

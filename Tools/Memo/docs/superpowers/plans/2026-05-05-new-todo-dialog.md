@@ -1,5 +1,7 @@
 # New Todo Dialog Implementation Plan
 
+> **历史档案：** 本计划已于 2026-05-05 实现，当前行为以代码和测试为准；下面未勾选的步骤不是待办，不要再按它执行。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a full "新建待办" dialog that collects title, tags, subtasks, due date, and priority before creating a todo.
